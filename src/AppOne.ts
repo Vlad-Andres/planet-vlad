@@ -1,4 +1,14 @@
-import { Scene, Engine, Vector3, HemisphericLight, MeshBuilder, FreeCamera, StandardMaterial, Color3} from 'babylonjs'
+import {
+    Scene,
+    Engine,
+    Vector3,
+    HemisphericLight,
+    MeshBuilder,
+    FreeCamera,
+    StandardMaterial,
+    Color3,
+    Texture
+} from 'babylonjs'
 export class AppOne {
     engine: Engine;
     scene: Scene;
@@ -30,33 +40,42 @@ export class AppOne {
 
 
 var createScene = function (engine: Engine, canvas: HTMLCanvasElement) {
-    // This creates a basic Babylon Scene object (non-mesh)
-    var scene = new Scene(engine);
+    const scene = new Scene(engine)
 
-    // This creates and positions a free camera (non-mesh)
-    var camera = new FreeCamera("camera1", new Vector3(0, 5, -10), scene);
+    // Create a static camera
+    const camera = new FreeCamera('camera1', new Vector3(0, 0, -10), scene)
+    camera.setTarget(Vector3.Zero())
 
-    // This targets the camera to scene origin
-    camera.setTarget(Vector3.Zero());
+    // Add a light
+    const light = new HemisphericLight('light1', new Vector3(0, 1, 0), scene)
+    light.intensity = 0.8
 
-    // This attaches the camera to the canvas
-    camera.attachControl(canvas, true);
+    // Create a non-uniform sphere
+    const sphere = MeshBuilder.CreateSphere('sphere', { diameter: 8, segments: 64 }, scene)
 
-    // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
-    var light = new HemisphericLight("light", new Vector3(0, 1, 0), scene);
+    // Deform the sphere slightly to make it non-uniform
+    const positions = sphere.getVerticesData('position') || []
+    for (let i = 0; i < positions.length; i += 3) {
+      const x = positions[i]
+      const y = positions[i + 1]
+      const z = positions[i + 2]
+      positions[i + 1] += Math.sin(x * z) * 0.3 // Modify the Y-axis to create unevenness
+    }
+    sphere.updateVerticesData('position', positions)
 
-    // Default intensity is 1. Let's dim the light a small amount
-    light.intensity = 0.7;
+    // Apply material to the sphere
+    const material = new StandardMaterial('material', scene)
+    material.diffuseTexture = new Texture('https://www.babylonjs.com/assets/earth.jpg', scene) // Planet texture
+    sphere.material = material
 
-    // Our built-in 'sphere' shape.
-    var sphere = MeshBuilder.CreateSphere("sphere", { diameter: 2, segments: 32 }, scene);
-    // Move the sphere upward 1/2 its height
-    let startPos = 2;
-    sphere.position.y = startPos;
+    // Rotate the sphere over time
+    scene.registerBeforeRender(() => {
+      sphere.rotation.y += 0.01 // Rotate around the Y-axis
+    })
 
-    var redMaterial = new StandardMaterial("redMaterial", scene);
-    redMaterial.diffuseColor = new Color3(1, 0, 0); // RGB for red
-    sphere.material = redMaterial;
 
-    return scene;
+    // TODO: Import the blender shperes using babylon importer and smothly change them while rotating so it looks
+    // like a continous animation and like a planet during rotation transforms to another one
+    // https://doc.babylonjs.com/divingDeeper/importers/blender
+    return scene
 };
