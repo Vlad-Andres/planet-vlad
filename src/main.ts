@@ -2,7 +2,12 @@ import { AppOne as App } from './AppOne';
 
 console.log(`main.ts starting ${App.name}`);
 window.addEventListener('DOMContentLoaded', () => {
-    let canvas = document.getElementById('renderCanvas') as HTMLCanvasElement;
-    let app = new App(canvas);
-    app.run();
+    let canvasElement = document.getElementById('renderCanvas');
+    if (canvasElement instanceof HTMLCanvasElement) {
+        let app = new App(canvasElement);
+        app.run();
+        app.run();
+    } else {
+        console.error('renderCanvas element is not a canvas');
+    }
 });
