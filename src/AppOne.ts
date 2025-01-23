@@ -11,12 +11,15 @@ import {
     Texture,
     Material,
     PBRMaterial,
-    ArcRotateCamera
+    ArcRotateCamera,
+    VertexBuffer
 } from 'babylonjs'
 export class AppOne {
     engine: Engine;
     scene: Scene;
 
+    materials: PBRMaterial[] = [];
+    currentMaterialIndex = 0;
     sphereUVScale = Vector2.FromArray([5, 5]);
 
     constructor(readonly canvas: HTMLCanvasElement) {
@@ -147,6 +150,8 @@ export class AppOne {
     }
 
     createEnvironment(): void {
+        this.materials.push(this.getPBRSphereMaterial('brick'))
+        this.materials.push(this.getPBRSphereMaterial('stone'))
         const scene = this.scene
         const sphere = MeshBuilder.CreateSphere('sphere', { diameter: 8, segments: 64, updatable:true }, scene)
 
@@ -163,6 +168,57 @@ export class AppOne {
             sphere.rotation.y -= 0.002
             sphere.rotation.z -= 0.001
         })
+
+        // Wait 5 seconds, then start the smooth material update
+        setTimeout(() => {
+            this.changeMaterialSmoothly();
+        }, 2000);
+    }
+
+    changeMaterialSmoothly(): void {
+        const sphere = this.scene.getMeshByName("sphere");
+        if (!sphere || !(sphere.material instanceof PBRMaterial)) return;
+
+        // Get the new material
+        this.currentMaterialIndex = (this.currentMaterialIndex + 1) % this.materials.length;
+        const newMaterial = this.materials[this.currentMaterialIndex];
+
+        // Access sphere geometry
+        const positions = sphere.getVerticesData(VertexBuffer.PositionKind)!;
+        const indices = sphere.getIndices()!;
+        const normals = sphere.getVerticesData(VertexBuffer.NormalKind)!;
+
+        const camera = this.scene.activeCamera as ArcRotateCamera;
+
+        // Iterate through the vertices and selectively update UVs
+        for (let i = 0; i < positions.length; i += 3) {
+          const vertex = new Vector3(positions[i], positions[i + 1], positions[i + 2]);
+
+          // Check if the vertex is visible
+          if (!this.isPointVisible(camera, vertex)) {
+            //TODO: Find a way to change only the vectors that are not visible,
+            // -- Smoothly change the material of the sphere starting with those that are behind the camera
+            sphere.material = newMaterial;
+          }
+        }
+      }
+
+    isPointVisible(camera: ArcRotateCamera, point: Vector3): boolean {
+        const viewport = this.engine.getRenderingCanvasClientRect()!;
+        const projectedPoint = Vector3.Project(
+            point,
+            camera.getWorldMatrix(),
+            this.scene.getTransformMatrix(),
+            camera.viewport.toGlobal(viewport.width, viewport.height)
+        );
+
+        // Check if the point is within the visible range
+        return (
+            projectedPoint.x >= 0 &&
+            projectedPoint.x <= viewport.width &&
+            projectedPoint.y >= 0 &&
+            projectedPoint.y <= viewport.height
+        );
     }
 
 }
