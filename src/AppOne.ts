@@ -2,23 +2,30 @@ import {
     Scene,
     Engine,
     Vector3,
+    Vector2,
     HemisphericLight,
     MeshBuilder,
     FreeCamera,
     StandardMaterial,
     Color3,
-    Texture
+    Texture,
+    Material,
+    PBRMaterial,
+    ArcRotateCamera
 } from 'babylonjs'
 export class AppOne {
     engine: Engine;
     scene: Scene;
+
+    sphereUVScale = Vector2.FromArray([5, 5]);
 
     constructor(readonly canvas: HTMLCanvasElement) {
         this.engine = new Engine(canvas)
         window.addEventListener('resize', () => {
             this.engine.resize();
         });
-        this.scene = createScene(this.engine, this.canvas)
+        this.scene = this.createScene(this.engine, this.canvas)
+        this.createEnvironment()
 
     }
 
@@ -36,46 +43,126 @@ export class AppOne {
             this.scene.render();
         });
     }
-}
+
+    createScene = function (engine: Engine, canvas: HTMLCanvasElement) {
+        const scene = new Scene(engine)
+
+        // Create a static camera
+        var camera = new ArcRotateCamera("Camera", 0, 0, 0, Vector3.FromArray([12, 0, 0]), scene);
+        camera.setTarget(Vector3.Zero())
+
+        // Add a neon retro wave light
+
+        const neonLight = new HemisphericLight('neonLight', new Vector3(1, 0, 1), scene)
+        neonLight.intensity = 0.4
+        neonLight.diffuse = Color3.FromHexString('#00FFAA')
+        neonLight.specular = Color3.FromHexString('#00FFFF')
+        neonLight.groundColor = Color3.FromHexString('#00FFFF')
+
+        // Add a light to the scene
 
 
-var createScene = function (engine: Engine, canvas: HTMLCanvasElement) {
-    const scene = new Scene(engine)
+        const light = new HemisphericLight('light1', new Vector3(0, 1, 0), scene)
+        light.intensity = 0.7
 
-    // Create a static camera
-    const camera = new FreeCamera('camera1', new Vector3(0, 0, -10), scene)
-    camera.setTarget(Vector3.Zero())
+        // Apply material to the sphere
 
-    // Add a light
-    const light = new HemisphericLight('light1', new Vector3(0, 1, 0), scene)
-    light.intensity = 0.8
+        // TODO: create a displacement map material from basecolor, normal, roughness, ambient occlusion
 
-    // Create a non-uniform sphere
-    const sphere = MeshBuilder.CreateSphere('sphere', { diameter: 8, segments: 64 }, scene)
+        // TODO: Import the blender shperes using babylon importer and smothly change them while rotating so it looks
+        // like a continous animation and like a planet during rotation transforms to another one
 
-    // Deform the sphere slightly to make it non-uniform
-    const positions = sphere.getVerticesData('position') || []
-    for (let i = 0; i < positions.length; i += 3) {
-      const x = positions[i]
-      const y = positions[i + 1]
-      const z = positions[i + 2]
-      positions[i + 1] += Math.sin(x * z) * 0.3 // Modify the Y-axis to create unevenness
+        return scene
     }
-    sphere.updateVerticesData('position', positions)
 
-    // Apply material to the sphere
-    const material = new StandardMaterial('material', scene)
-    material.diffuseTexture = new Texture('https://www.babylonjs.com/assets/earth.jpg', scene) // Planet texture
-    sphere.material = material
+    getPBRSphereMaterial(asset: string): PBRMaterial {
+        const material = new PBRMaterial('material', this.scene)
+        const texturesArray: Texture[] = []
 
-    // Rotate the sphere over time
-    scene.registerBeforeRender(() => {
-      sphere.rotation.y += 0.01 // Rotate around the Y-axis
-    })
+        // Load displacement map
+        const albedo = new Texture('public/displacement-models/'+ asset + '/albedo.png', this.scene)
+        texturesArray.push(albedo)
+        const normal = new Texture('public/displacement-models/'+ asset +'/normal.png', this.scene)
+        texturesArray.push(normal)
+        const roughness = new Texture('public/displacement-models/'+ asset +'/roughness.png', this.scene)
+        texturesArray.push(roughness)
+        const ambientOcclusion = new Texture('public/displacement-models/'+ asset +'/ambientOcclusion.png', this.scene)
+        texturesArray.push(ambientOcclusion)
+        const metallic = new Texture('public/displacement-models/'+ asset +'/metallic.png', this.scene)
+        texturesArray.push(metallic)
+
+        texturesArray.forEach(texture => {
+            texture.uScale = this.sphereUVScale.x
+            texture.vScale = this.sphereUVScale.y
+        });
+
+        // displacement.uScale = displacement.vScale = 3
+        material.albedoTexture = albedo
+        material.bumpTexture = normal
+        material.ambientTexture = ambientOcclusion
+        material.metallicTexture = metallic
+
+        // material.microSurface = 0.1
+        material.useAmbientOcclusionFromMetallicTextureRed = true
+        material.invertNormalMapX = true
+        material.invertNormalMapY = true
+        material.roughness = 0.65
+        // material.wireframe = true
 
 
-    // TODO: Import the blender shperes using babylon importer and smothly change them while rotating so it looks
-    // like a continous animation and like a planet during rotation transforms to another one
-    // https://doc.babylonjs.com/divingDeeper/importers/blender
-    return scene
-};
+        return material
+    }
+
+    getMaterial(asset: string): Material {
+        const material = new StandardMaterial('material', this.scene)
+        const texturesArray: Texture[] = []
+
+        // Load displacement map
+        const baseColor = new Texture('public/displacement-models/'+ asset +'/base.png', this.scene)
+        texturesArray.push(baseColor)
+        const normal = new Texture('public/displacement-models/'+ asset +'/normal.png', this.scene)
+        texturesArray.push(normal)
+        const roughness = new Texture('public/displacement-models/'+ asset +'/roughness.png', this.scene)
+        texturesArray.push(roughness)
+        const ambientOcclusion = new Texture('public/displacement-models/'+ asset +'/ambientOcclusion.png', this.scene)
+        texturesArray.push(ambientOcclusion)
+        const displacement = new Texture('public/displacement-models/'+ asset +'/height.png', this.scene)
+        texturesArray.push(displacement)
+
+        texturesArray.forEach(texture => {
+            texture.uScale = this.sphereUVScale.x
+            texture.vScale = this.sphereUVScale.y
+        });
+
+        material.diffuseTexture = baseColor
+        material.bumpTexture = normal
+        material.specularTexture = roughness
+        material.ambientTexture = ambientOcclusion
+        material.specularPower = 10
+
+        material.invertNormalMapY = true
+        material.invertNormalMapX = true
+
+        return material
+    }
+
+    createEnvironment(): void {
+        const scene = this.scene
+        const sphere = MeshBuilder.CreateSphere('sphere', { diameter: 8, segments: 64, updatable:true }, scene)
+
+        const asset = 'brick'
+        let material = this.getPBRSphereMaterial(asset)
+        sphere.applyDisplacementMap('public/displacement-models/'+ asset +'/height.png', 0, 1, undefined, undefined, this.sphereUVScale);
+        // var material = new StandardMaterial("kosh", scene);
+        sphere.material = material
+        // material.wireframe = true;
+
+
+        // Rotate the sphere over time
+        scene.registerBeforeRender(() => {
+            sphere.rotation.y -= 0.002
+            sphere.rotation.z -= 0.001
+        })
+    }
+
+}
