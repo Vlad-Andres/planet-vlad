@@ -37,7 +37,7 @@ export class AppOne {
     }
 
     run() {
-        this.debug(false);
+        this.debug(true);
         this.engine.runRenderLoop(() => {
             this.scene.render();
         });
@@ -64,7 +64,7 @@ export class AppOne {
 
     createEnvironment(): void {
         const scene = this.scene
-        const sphere = MeshBuilder.CreateSphere('sphere', { diameter: 8, segments: 32, updatable:true }, scene)
+        const sphere = MeshBuilder.CreateSphere('sphere', { diameter: 8, segments: 3, updatable:true }, scene)
 
         const asset = 'brick'
         sphere.applyDisplacementMap('public/displacement-models/'+ asset +'/height.png', 0, 1, undefined, undefined, Materials.getScale());

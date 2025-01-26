@@ -7,7 +7,7 @@ import {
     MeshBuilder,
     FreeCamera,
     StandardMaterial,
-    Color3,
+    Color4,
     Texture,
     Material,
     PBRMaterial,
@@ -15,7 +15,10 @@ import {
     VertexBuffer,
     SubMesh,
     Mesh,
-    MultiMaterial
+    MultiMaterial,
+    Frustum,
+    Matrix,
+    Ray
 } from 'babylonjs'
 import { Materials } from './Materials';
 export class PlanetTransition {
@@ -23,7 +26,6 @@ export class PlanetTransition {
     private sphere: Mesh
     private currentIndex: number = 0
     private engine: Engine
-    private transitionInProgress: boolean = false
 
     constructor(sphere: Mesh) {
         this.sphere = sphere
@@ -32,38 +34,85 @@ export class PlanetTransition {
 
         // Apply initial material
         this.sphere.material = Materials.get(0)
+        this.sphere.material.alpha = 0.5
         
         // Start the transition after a delay
-        setTimeout(() => {
-            this.startTransition()
-        }, 200)
+        const totalFaces = this.sphere.getIndices()!.length/3
+        const positions = this.sphere.getPositionData()!
+        const indices = this.sphere.getIndices()!
+        const vertices = this.sphere.getVerticesData(VertexBuffer.PositionKind)!
 
-        // Add rotation animation
-        this.scene.registerBeforeRender(() => {
-            sphere.rotation.y -= 0.002
-            sphere.rotation.z -= 0.001
-        })
+        for (let i = 0; i < totalFaces; i++) {
+            setTimeout(() => {
+                const positions = [
+                    new Vector3(vertices[indices[i] * 3], vertices[indices[i] * 3 + 1], vertices[indices[i] * 3 + 2]),
+                    new Vector3(vertices[indices[i + 1] * 3], vertices[indices[i + 1] * 3 + 1], vertices[indices[i + 1] * 3 + 2]),
+                    new Vector3(vertices[indices[i + 2] * 3], vertices[indices[i + 2] * 3 + 1], vertices[indices[i + 2] * 3 + 2])
+                ];
+                const isVisible = this.isFaceVisible(this.scene.activeCamera! as ArcRotateCamera, positions)
+                console.log(
+                    'faceIndex: ' + i,
+                    'visible: ' + isVisible    
+                )
+                if (isVisible) {
+                    this.highlightFace(i);
+                }
+            }, i * 100);
+        }
+        
+
+        // setTimeout(() => {
+            // this.startTransition()
+        // }, 200)
+
+        // this.scene.registerBeforeRender(() => {
+        //     sphere.rotation.y -= 0.002
+        //     sphere.rotation.z -= 0.001
+        // })
     }
 
-    startTransition(): void {
-        if (this.transitionInProgress) return;
+    private highlightFace(faceIndex: number): void {
+        const indices = this.sphere.getIndices()!
+        const vertices = this.sphere.getVerticesData(VertexBuffer.PositionKind)!
+        const sphere = this.sphere!
+        sphere
         
-        this.transitionInProgress = true;
-        this.currentIndex = (this.currentIndex + 1) % Materials.getMaterialsCount();
+        if (!indices || !vertices) return;
         
-        // Start the material transition
-        this.changeMaterialSmoothly();
+        const i = faceIndex * 3;
+        const positions = [
+            new Vector3(vertices[indices[i] * 3], vertices[indices[i] * 3 + 1], vertices[indices[i] * 3 + 2]),
+            new Vector3(vertices[indices[i + 1] * 3], vertices[indices[i + 1] * 3 + 1], vertices[indices[i + 1] * 3 + 2]),
+            new Vector3(vertices[indices[i + 2] * 3], vertices[indices[i + 2] * 3 + 1], vertices[indices[i + 2] * 3 + 2])
+        ];
+
+        // Create submesh for the face
+        new SubMesh(
+            1,  // material index
+            0,  // vertex start
+            sphere.getTotalVertices(),  // vertex count
+            i,  // index start
+            3,  // index count
+            sphere
+        );
+
+        // Create submesh for the remaining faces
         
-        // Reset transition flag after completion
-        setTimeout(() => {
-            this.transitionInProgress = false;
-            this.sphere.material = Materials.get(this.currentIndex);
-            
-            // Schedule next transition
-            setTimeout(() => {
-                this.startTransition();
-            }, 3000);
-        }, 1000);
+        const redColor = new Color4(1, 0, 0, 1);
+
+        // Create highlight lines
+        const lines = MeshBuilder.CreateLines("highlight", {
+            points: [...positions, positions[0]],
+            colors: [
+                new Color4(1, 0, 0, 1),
+                new Color4(1, 0, 0, 1),
+                new Color4(1, 0, 0, 1),
+                new Color4(1, 0, 0, 1)
+            ]
+        }, this.scene);
+        
+        // Remove highlight after 2 seconds
+        // setTimeout(() => lines.dispose(), 2000);
     }
 
     changeMaterialSmoothly(): void {
@@ -165,21 +214,40 @@ export class PlanetTransition {
         }, 16);
     }
 
-    isPointVisible(camera: ArcRotateCamera, point: Vector3): boolean {
-        const viewport = this.engine.getRenderingCanvasClientRect()!;
-        const projectedPoint = Vector3.Project(
-            point,
-            camera.getWorldMatrix(),
-            this.scene.getTransformMatrix(),
-            camera.viewport.toGlobal(viewport.width, viewport.height)
+    isFaceVisible(camera: ArcRotateCamera, positions: Vector3[]): boolean {
+        // Transform face vertices to world space
+        const worldMatrix = this.sphere.getWorldMatrix();
+        const worldPositions = positions.map(pos => 
+            Vector3.TransformCoordinates(pos, worldMatrix)
         );
-
-        // Check if the point is within the visible range
-        return (
-            projectedPoint.x >= 0 &&
-            projectedPoint.x <= viewport.width &&
-            projectedPoint.y >= 0 &&
-            projectedPoint.y <= viewport.height
+    
+        // Get frustum planes from the camera's view-projection matrix
+        const viewProjectionMatrix = camera.getViewMatrix().multiply(camera.getProjectionMatrix());
+        const frustumPlanes = Frustum.GetPlanes(viewProjectionMatrix);
+    
+        // Check if all vertices are within the frustum
+        const isInFrustum = worldPositions.every(pos => 
+            Frustum.IsPointInFrustum(pos, frustumPlanes)
         );
+    
+        if (!isInFrustum) {
+            return false; // Face is outside the camera's frustum
+        }
+    
+        // Check if the face is facing the camera
+        const faceNormal = this.calculateFaceNormal(worldPositions);
+        const cameraDirection = camera.position.subtract(this.sphere.position).normalize();
+        const dotProduct = Vector3.Dot(faceNormal, cameraDirection);
+    
+        // Face is visible if it's within the frustum and facing the camera
+        return dotProduct > 0;
+    }
+    
+    // Helper function to calculate the face normal
+    private calculateFaceNormal(positions: Vector3[]): Vector3 {
+        const edge1 = positions[1].subtract(positions[0]);
+        const edge2 = positions[2].subtract(positions[0]);
+        const normal = Vector3.Cross(edge1, edge2).normalize();
+        return normal;
     }
 }
