@@ -18,7 +18,9 @@ import {
     MultiMaterial,
     Frustum,
     Matrix,
-    Ray
+    Ray,
+    VertexData,
+    IndicesArray
 } from 'babylonjs'
 import { Materials } from './Materials';
 export class PlanetTransition {
@@ -26,49 +28,159 @@ export class PlanetTransition {
     private sphere: Mesh
     private currentIndex: number = 0
     private engine: Engine
+    private camera: ArcRotateCamera
 
     constructor(sphere: Mesh) {
         this.sphere = sphere
         this.scene = this.sphere.getScene()
         this.engine = this.scene.getEngine()
+        this.camera = this.scene.activeCamera as ArcRotateCamera
 
         // Apply initial material
-        this.sphere.material = Materials.get(0)
-        this.sphere.material.alpha = 0.5
+        this.sphere.material = this.getMultiMaterial()
         
         // Start the transition after a delay
-        const totalFaces = this.sphere.getIndices()!.length/3
-        const positions = this.sphere.getPositionData()!
-        const indices = this.sphere.getIndices()!
-        const vertices = this.sphere.getVerticesData(VertexBuffer.PositionKind)!
 
-        for (let i = 0; i < totalFaces; i++) {
-            setTimeout(() => {
-                const positions = [
-                    new Vector3(vertices[indices[i] * 3], vertices[indices[i] * 3 + 1], vertices[indices[i] * 3 + 2]),
-                    new Vector3(vertices[indices[i + 1] * 3], vertices[indices[i + 1] * 3 + 1], vertices[indices[i + 1] * 3 + 2]),
-                    new Vector3(vertices[indices[i + 2] * 3], vertices[indices[i + 2] * 3 + 1], vertices[indices[i + 2] * 3 + 2])
-                ];
-                const isVisible = this.isFaceVisible(this.scene.activeCamera! as ArcRotateCamera, positions)
-                console.log(
-                    'faceIndex: ' + i,
-                    'visible: ' + isVisible    
-                )
-                if (isVisible) {
-                    this.highlightFace(i);
-                }
-            }, i * 100);
-        }
         
 
         // setTimeout(() => {
-            // this.startTransition()
+            this.transitToMaterial(1)
         // }, 200)
 
-        // this.scene.registerBeforeRender(() => {
-        //     sphere.rotation.y -= 0.002
-        //     sphere.rotation.z -= 0.001
-        // })
+        this.scene.registerAfterRender(() => {
+            this.camera.alpha -= 0.002
+            this.camera.beta += 0.001
+        })
+    }
+
+    private getMultiMaterial(): MultiMaterial {
+        const multiMaterial = new MultiMaterial("multiMaterial", this.scene);
+        for (let i = 0; i < Materials.getMaterialsCount(); i++) {
+            multiMaterial.subMaterials.push(Materials.get(i))
+        }
+
+        return multiMaterial
+    }
+
+    private processHiddenIndices(fromIndices: IndicesArray, processedFaces: number[] = []): {
+        hidden: number[],
+        visible: number[],
+        faces: number[] 
+    } {
+        const totalFaces = fromIndices.length / 3;
+        const indices = fromIndices;
+        const vertices = this.sphere.getVerticesData(VertexBuffer.PositionKind)!;
+        const nonVisibleIndices: number[] = [];
+        const visibleIndices: number[] = [];
+    
+        for (let i = 0; i < totalFaces; i++) {
+            const vertexIndex0 = indices[i * 3];     // Index of the first vertex
+            const vertexIndex1 = indices[i * 3 + 1]; // Index of the second vertex
+            const vertexIndex2 = indices[i * 3 + 2]; // Index of the third vertex
+    
+            const vertex0 = [
+                vertices[vertexIndex0 * 3],     // x-coordinate of vertex 0
+                vertices[vertexIndex0 * 3 + 1], // y-coordinate of vertex 0
+                vertices[vertexIndex0 * 3 + 2]  // z-coordinate of vertex 0
+            ];
+    
+            const vertex1 = [
+                vertices[vertexIndex1 * 3],     // x-coordinate of vertex 1
+                vertices[vertexIndex1 * 3 + 1], // y-coordinate of vertex 1
+                vertices[vertexIndex1 * 3 + 2]  // z-coordinate of vertex 1
+            ];
+    
+            const vertex2 = [
+                vertices[vertexIndex2 * 3],     // x-coordinate of vertex 2
+                vertices[vertexIndex2 * 3 + 1], // y-coordinate of vertex 2
+                vertices[vertexIndex2 * 3 + 2]  // z-coordinate of vertex 2
+            ];
+    
+            const positions = [
+                new Vector3(vertex0[0], vertex0[1], vertex0[2]), // Vertex 0
+                new Vector3(vertex1[0], vertex1[1], vertex1[2]), // Vertex 1
+                new Vector3(vertex2[0], vertex2[1], vertex2[2])  // Vertex 2
+            ];
+    
+            const isVisible = this.isFaceFacingCamera(this.scene.activeCamera! as ArcRotateCamera, positions);
+            
+            if (!isVisible && !processedFaces.includes(i)) {
+                this.highlightFace(i);
+                processedFaces.push(i)
+                nonVisibleIndices.push(vertexIndex0, vertexIndex1, vertexIndex2);
+            } else {
+                visibleIndices.push(vertexIndex0, vertexIndex1, vertexIndex2);
+            }
+        }
+    
+        return { hidden: nonVisibleIndices, visible: visibleIndices, faces: processedFaces };
+    }
+    
+    private transitToMaterial(materialIndex: number):boolean {
+        const indices = this.sphere.getIndices()!
+        const totalFaces = indices.length / 3;
+        let processedFaces: number[] = []
+        let processedIndices: number[] = []
+        let visibleIndices = indices
+        // processedIndices = this.processHiddenIndices(indices)
+
+        const interval = setInterval(() => {
+            let resultOfProcessing = this.processHiddenIndices(indices, processedFaces)
+            processedIndices.push(...this.processHiddenIndices(visibleIndices).hidden)
+            processedFaces = resultOfProcessing.faces
+            // console.log(indices)
+
+            // console.log(processedIndices.length +' of ' + indices.length + ' left: '+ visibleIndices.length)
+            // Get the indices other than those processed from all
+            visibleIndices = resultOfProcessing.visible
+            console.log('Still ' + processedFaces.length + ' left' + totalFaces)
+            // Stop the interval when the array is empty
+            if (processedFaces.length === totalFaces) {
+                clearInterval(interval);
+                console.log("Array is empty. Stopping...");
+            }
+        }, 1000); // Execute every 1 second
+            
+        // while (indicesToProcess.length > 0) {
+            // console.log('repeat')
+            // setTimeout(() => {
+            //     console.log(indicesToProcess)
+            //     indicesToProcess = this.getHiddenIndices(visibleIndices)
+            // }, 2000)
+
+            // TODO use the following code
+            // Step 1: Group indices into contiguous ascending sequences
+            // const groupedIndices = this.getAscendingSubGroupsFromArray(indicesToProcess);
+            // groupedIndices.forEach((group, index) => {
+            //     console.log(`Group ${index + 1}: ${group.join(', ')}`);
+            // });
+            // Step 2: Create SubMeshes for each group
+
+            // groupedIndices.forEach((group, index) => {
+            //     const startIndex = group[0];
+            //     const endIndex = group[group.length - 1];
+        
+            //     const subMesh = new SubMesh(
+            //         1, // Material index
+            //         0, // Vertex start
+            //         this.sphere.getTotalVertices(), // Vertex count
+            //         startIndex, // Index start
+            //         endIndex - startIndex + 1, // Index count
+            //         this.sphere
+            //     );
+            // });
+
+                // indicesToProcess = this.getHiddenIndices(visibleIndices)
+
+
+        // }
+
+
+        return true
+
+        // setTimeout(() => {
+        //     this.highlightFacesFacingCamera()
+        // }, 2000)
     }
 
     private highlightFace(faceIndex: number): void {
@@ -87,6 +199,7 @@ export class PlanetTransition {
         ];
 
         // Create submesh for the face
+        // TODO: Replace this by using groups of ascending continuous indices
         new SubMesh(
             1,  // material index
             0,  // vertex start
@@ -110,144 +223,82 @@ export class PlanetTransition {
                 new Color4(1, 0, 0, 1)
             ]
         }, this.scene);
-        
-        // Remove highlight after 2 seconds
-        // setTimeout(() => lines.dispose(), 2000);
-    }
-
-    changeMaterialSmoothly(): void {
-        console.log('initiated transition..')
-        const sphere = this.sphere;
-        if (!sphere) return;
-
-        // Set up materials for visible and non-visible parts
-        const material0 = Materials.get(0);
-        const material1 = Materials.get(1);
-        const multiMaterial = new MultiMaterial("multi", this.scene)
-        multiMaterial.subMaterials.push(material0) // material for visible faces
-        multiMaterial.subMaterials.push(material1) // material for non-visible faces
-        sphere.material = multiMaterial
-
-        const camera = this.scene.activeCamera! as ArcRotateCamera
-        const spherePosition = sphere.position
-        const cameraDirection = camera.position.subtract(spherePosition).normalize()!
-
-        // Calculate visible and hidden vertices
-        const vertices = sphere.getVerticesData(VertexBuffer.PositionKind)!
-        const indices = sphere.getIndices()!
-        const normals = sphere.getVerticesData(VertexBuffer.NormalKind)!
-        
-        const visibleIndices: number[] = [];
-        const hiddenIndices: number[] = [];
-
-        // Update submeshes based on camera position
-        sphere.subMeshes = [];
-
-        // Get sphere's world matrix to account for its rotation
-        const sphereWorldMatrix = sphere.getWorldMatrix();
-
-        // Process triangles in groups of 3 vertices
-        const threshold = -0.2; // Adjusted threshold for better separation
-        for (let i = 0; i < indices.length; i += 3) {
-            const idx1 = indices[i] * 3;
-            const idx2 = indices[i + 1] * 3;
-            const idx3 = indices[i + 2] * 3;
-            
-            // Get vertex positions in world space
-            const pos1 = Vector3.TransformCoordinates(
-                new Vector3(vertices[idx1], vertices[idx1 + 1], vertices[idx1 + 2]),
-                sphereWorldMatrix
-            );
-            const pos2 = Vector3.TransformCoordinates(
-                new Vector3(vertices[idx2], vertices[idx2 + 1], vertices[idx2 + 2]),
-                sphereWorldMatrix
-            );
-            const pos3 = Vector3.TransformCoordinates(
-                new Vector3(vertices[idx3], vertices[idx3 + 1], vertices[idx3 + 2]),
-                sphereWorldMatrix
-            );
-            
-            // Calculate face normal using cross product of edges
-            const edge1 = pos2.subtract(pos1);
-            const edge2 = pos3.subtract(pos1);
-            const faceNormal = Vector3.Cross(edge1, edge2).normalize();
-            
-            // Calculate dot product with camera direction
-            const dot = Vector3.Dot(faceNormal, cameraDirection);
-            
-            // Assign triangle based on whether it faces the camera
-            if (dot > threshold) {
-                visibleIndices.push(indices[i], indices[i + 1], indices[i + 2]);
-            } else {
-                hiddenIndices.push(indices[i], indices[i + 1], indices[i + 2]);
-            }
-        }
-
-        // Create submeshes for visible and hidden parts
-        const verticesCount = sphere.getTotalVertices();
-
-        if (visibleIndices.length > 0) {
-            new SubMesh(
-                0,  // material index
-                0,  // vertex start
-                verticesCount,  // vertex count
-                visibleIndices[0],  // index start
-                visibleIndices.length,  // index count
-                sphere
-            );
-        }
-        
-        if (hiddenIndices.length > 0) {
-            new SubMesh(
-                1,  // material index
-                0,  // vertex start
-                verticesCount,  // vertex count
-                hiddenIndices[0],  // index start
-                hiddenIndices.length,  // index count
-                sphere
-            );
-        }
-
-        // Schedule next update
-        setTimeout(() => {
-            this.changeMaterialSmoothly();
-        }, 16);
-    }
-
-    isFaceVisible(camera: ArcRotateCamera, positions: Vector3[]): boolean {
-        // Transform face vertices to world space
-        const worldMatrix = this.sphere.getWorldMatrix();
-        const worldPositions = positions.map(pos => 
-            Vector3.TransformCoordinates(pos, worldMatrix)
-        );
-    
-        // Get frustum planes from the camera's view-projection matrix
-        const viewProjectionMatrix = camera.getViewMatrix().multiply(camera.getProjectionMatrix());
-        const frustumPlanes = Frustum.GetPlanes(viewProjectionMatrix);
-    
-        // Check if all vertices are within the frustum
-        const isInFrustum = worldPositions.every(pos => 
-            Frustum.IsPointInFrustum(pos, frustumPlanes)
-        );
-    
-        if (!isInFrustum) {
-            return false; // Face is outside the camera's frustum
-        }
-    
-        // Check if the face is facing the camera
-        const faceNormal = this.calculateFaceNormal(worldPositions);
-        const cameraDirection = camera.position.subtract(this.sphere.position).normalize();
-        const dotProduct = Vector3.Dot(faceNormal, cameraDirection);
-    
-        // Face is visible if it's within the frustum and facing the camera
-        return dotProduct > 0;
     }
     
     // Helper function to calculate the face normal
-    private calculateFaceNormal(positions: Vector3[]): Vector3 {
+    private isFaceInFrustum(camera: ArcRotateCamera, positions: Vector3[]): boolean {
+        // Get the frustum planes from the camera
+        const frustumPlanes = Frustum.GetPlanes(camera.getViewMatrix().multiply(camera.getProjectionMatrix()));
+    
+        // Check if all vertices of the face are within the frustum
+        return positions.every(pos => 
+            Frustum.IsPointInFrustum(pos, frustumPlanes)
+        );
+    }
+
+    private isFaceFacingCamera(camera: ArcRotateCamera, positions: Vector3[]): boolean {
+        // Calculate the face normal
         const edge1 = positions[1].subtract(positions[0]);
         const edge2 = positions[2].subtract(positions[0]);
-        const normal = Vector3.Cross(edge1, edge2).normalize();
-        return normal;
+        const faceNormal = Vector3.Cross(edge1, edge2).normalize();
+    
+        // Calculate the camera direction (from face to camera)
+        const faceCenter = positions.reduce((acc, pos) => acc.add(pos), new Vector3(0, 0, 0)).scaleInPlace(1 / 3);
+        const cameraDirection = camera.position.subtract(faceCenter).normalize();
+    
+        // Check if the face is facing the camera
+        const dotProduct = Vector3.Dot(faceNormal, cameraDirection);
+        return dotProduct < 0;
+    }
+
+    private getAscendingSubGroupsFromArray(indices: number[]): number[][] {
+        const sortedArr = [...new Set(indices)].sort((a, b) => a - b); // Remove duplicates and sort
+        const groups: number[][] = [];
+        let currentGroup: number[] = [];
+
+        for (let i = 0; i < sortedArr.length; i++) {
+            if (currentGroup.length === 0 || sortedArr[i] === currentGroup[currentGroup.length - 1] + 1) {
+                currentGroup.push(sortedArr[i]);
+            } else {
+                groups.push(currentGroup);
+                currentGroup = [sortedArr[i]];
+            }
+        }
+    
+        if (currentGroup.length > 0) {
+            groups.push(currentGroup);
+        }
+    
+        return groups;
+    }
+
+    /**
+     * Groups an array of indices into contiguous ascending sequences.
+     */
+    private groupAscendingSequences(indices: number[]): number[][] {
+        const groups: number[][] = [];
+        let currentGroup: number[] = [];
+
+        for (let i = 0; i < indices.length; i += 3) {
+            if (currentGroup.length === 0) {
+                currentGroup.push(indices[i], indices[i + 1], indices[i + 2]);
+            } else {
+                // Check if this face's indices are contiguous and ascending
+                const lastIndex = currentGroup[currentGroup.length - 1];
+                if (indices[i] > lastIndex && indices[i + 1] > indices[i] && indices[i + 2] > indices[i + 1]) {
+                    currentGroup.push(indices[i], indices[i + 1], indices[i + 2]);
+                } else {
+                    groups.push([...currentGroup]);
+                    currentGroup = [indices[i], indices[i + 1], indices[i + 2]];
+                }
+            }
+        }
+
+        // Push the final group
+        if (currentGroup.length > 0) {
+            groups.push(currentGroup);
+        }
+
+        return groups;
     }
 }

@@ -47,8 +47,18 @@ export class AppOne {
         const scene = new Scene(engine)
 
         // Create a static camera
-        var camera = new ArcRotateCamera("Camera", 0, 0, 0, Vector3.FromArray([12, 0, 0]), scene);
-        camera.setTarget(Vector3.Zero())
+        const camera = new ArcRotateCamera(
+            "camera", // Name
+            Math.PI / 4, // Alpha (horizontal angle)
+            Math.PI / 4, // Beta (vertical angle)
+            15, // Radius (distance from target)
+            new Vector3(0, 0, 0), // Target (point the camera looks at)
+            scene // Scene
+        );
+        // var camera = new ArcRotateCamera("Camera", 0, 0, 0, Vector3.FromArray([12, 0, 0]), scene);
+        // camera.setTarget(Vector3.Zero())
+        camera.attachControl(canvas, true);
+
 
         const neonLight = new HemisphericLight('neonLight', new Vector3(1, 0, 1), scene)
         neonLight.intensity = 0.4
@@ -64,7 +74,7 @@ export class AppOne {
 
     createEnvironment(): void {
         const scene = this.scene
-        const sphere = MeshBuilder.CreateSphere('sphere', { diameter: 8, segments: 3, updatable:true }, scene)
+        const sphere = MeshBuilder.CreateSphere('sphere', { diameter: 8, segments: 8, updatable:true }, scene)
 
         const asset = 'brick'
         sphere.applyDisplacementMap('public/displacement-models/'+ asset +'/height.png', 0, 1, undefined, undefined, Materials.getScale());
