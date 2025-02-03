@@ -2,19 +2,21 @@ import {
     Scene,
     Engine,
     Vector3,
-    Vector2,
     HemisphericLight,
     MeshBuilder,
-    FreeCamera,
-    Color3,
+    Color4,
     PBRMaterial,
-    ArcRotateCamera,
+    Mesh,
+    FollowCamera,
 } from 'babylonjs'
 import { Materials } from './Materials';
 import { PlanetTransition } from './PlanetTransition';
+import { PlayerMovement } from './PlayerMovement';
 export class AppOne {
     engine: Engine;
     scene: Scene;
+    planet!: Mesh;
+    camera!: FollowCamera;
 
     materials: PBRMaterial[] = [];
     currentMaterialIndex = 0;
@@ -24,8 +26,11 @@ export class AppOne {
         window.addEventListener('resize', () => {
             this.engine.resize();
         });
-        this.scene = this.createScene(this.engine, this.canvas)
+        this.scene = this.createScene(this.engine)
         this.createEnvironment()
+        new PlayerMovement(this.planet, this.scene)
+        this.setupCamera()
+        new PlanetTransition(this.planet)
     }
 
     debug(debugOn: boolean = true) {
@@ -37,55 +42,73 @@ export class AppOne {
     }
 
     run() {
-        this.debug(true);
+        this.debug(false);
         this.engine.runRenderLoop(() => {
             this.scene.render();
         });
     }
 
-    createScene = function (engine: Engine, canvas: HTMLCanvasElement) {
+    createScene = function (engine: Engine) {
         const scene = new Scene(engine)
+        scene.clearColor = new Color4(0, 0, 0, 1)
 
-        // Create a static camera
-        const camera = new ArcRotateCamera(
-            "camera", // Name
-            Math.PI / 4, // Alpha (horizontal angle)
-            Math.PI / 4, // Beta (vertical angle)
-            15, // Radius (distance from target)
-            new Vector3(0, 0, 0), // Target (point the camera looks at)
-            scene // Scene
-        );
-        // var camera = new ArcRotateCamera("Camera", 0, 0, 0, Vector3.FromArray([12, 0, 0]), scene);
-        // camera.setTarget(Vector3.Zero())
-        camera.attachControl(canvas, true);
-
-
-        const neonLight = new HemisphericLight('neonLight', new Vector3(1, 0, 1), scene)
-        neonLight.intensity = 0.4
-        neonLight.diffuse = Color3.FromHexString('#00FFAA')
-        neonLight.specular = Color3.FromHexString('#00FFFF')
-        neonLight.groundColor = Color3.FromHexString('#00FFFF')
-
-        const light = new HemisphericLight('light1', new Vector3(0, 1, 0), scene)
-        light.intensity = 0.7
-
+        // Setup lighting
+        new HemisphericLight('light1', new Vector3(0, 1, 0), scene).intensity = 0.7
+        
         return scene
     }
 
     createEnvironment(): void {
         const scene = this.scene
-        const sphere = MeshBuilder.CreateSphere('sphere', { diameter: 8, segments: 8, updatable:true }, scene)
+        // Create planet
+        this.planet = MeshBuilder.CreateSphere('planet', { diameter: 8, segments: 8, updatable:true }, scene)
+        this.planet.position = Vector3.Zero()
 
         const asset = 'brick'
-        sphere.applyDisplacementMap('public/displacement-models/'+ asset +'/height.png', 0, 1, undefined, undefined, Materials.getScale());
+        this.planet.applyDisplacementMap('public/displacement-models/'+ asset +'/height.png', 0, 1, undefined, undefined, Materials.getScale());
         // var material = new StandardMaterial("kosh", scene);
 
         new Materials(this.scene)
-        new PlanetTransition(sphere)
+        // new PlanetTransition(this.planet)
 
         // material.wireframe = true;
-        // sphere.material = Materials.get(0)
+        this.planet.material = Materials.get(0)
+    }
 
-        // Rotate the sphere over time
+    setupCamera(): void {
+        // Instead of creating the camera with a fixed target,
+        // create it and then parent it to the player.
+        // this.camera = new ArcRotateCamera("camera", -Math.PI/2, Math.PI/8, 10, Vector3.Zero(), this.scene);
+
+        // this.camera = new FollowCamera("camera", new Vector3(-Math.PI/2, Math.PI/8, 6), this.scene);
+        this.camera = new FollowCamera("camera", new Vector3(-Math.PI/2, Math.PI/8, 6), this.scene);
+
+        // The goal distance of camera from target
+        // camera.radius = 10;
+
+
+        // this.camera.parent = this.player;  // The camera now moves with the player.
+        // Set the camera's local position relative to the player:
+        // this.camera.position = new Vector3(0, 3, -8); // adjust as needed
+        // Optionally, force the camera to look at the player:
+        // this.camera.setTarget(this.player.position);
+        const player = this.scene.getMeshByName("player") as Mesh;
+
+        // Set the camera's target to the player
+        this.camera.lockedTarget = player;
+
+        // Smooth follow and update each frame
+        this.scene.registerBeforeRender(() => {
+            // Calculate the direction from the planet's center to the player
+            const playerDirection = player.position.subtract(this.planet.position).normalize();
+
+            // Set the camera's position to be behind the player, at a fixed distance
+            const cameraDistance = 10; // Adjust as needed
+            const cameraOffset = playerDirection.scale(cameraDistance); // Negative to position behind the player
+            this.camera.position = player.position.add(cameraOffset);
+
+            // Ensure the camera looks at the player
+            this.camera.setTarget(player.position);
+        });
     }
 }

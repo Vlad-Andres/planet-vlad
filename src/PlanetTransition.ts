@@ -48,7 +48,7 @@ export class PlanetTransition {
         // }, 200)
 
         this.scene.registerAfterRender(() => {
-            this.camera.alpha -= 0.002
+            this.camera.alpha -= 0.001
             this.camera.beta += 0.001
         })
     }
@@ -126,9 +126,9 @@ export class PlanetTransition {
 
         const interval = setInterval(() => {
             let resultOfProcessing = this.processHiddenIndices(indices, processedFaces)
-            processedIndices.push(...this.processHiddenIndices(visibleIndices).hidden)
+            processedIndices.push(...resultOfProcessing.hidden)
             processedFaces = resultOfProcessing.faces
-            // console.log(indices)
+            console.log('Running')
 
             // console.log(processedIndices.length +' of ' + indices.length + ' left: '+ visibleIndices.length)
             // Get the indices other than those processed from all
@@ -140,47 +140,8 @@ export class PlanetTransition {
                 console.log("Array is empty. Stopping...");
             }
         }, 1000); // Execute every 1 second
-            
-        // while (indicesToProcess.length > 0) {
-            // console.log('repeat')
-            // setTimeout(() => {
-            //     console.log(indicesToProcess)
-            //     indicesToProcess = this.getHiddenIndices(visibleIndices)
-            // }, 2000)
-
-            // TODO use the following code
-            // Step 1: Group indices into contiguous ascending sequences
-            // const groupedIndices = this.getAscendingSubGroupsFromArray(indicesToProcess);
-            // groupedIndices.forEach((group, index) => {
-            //     console.log(`Group ${index + 1}: ${group.join(', ')}`);
-            // });
-            // Step 2: Create SubMeshes for each group
-
-            // groupedIndices.forEach((group, index) => {
-            //     const startIndex = group[0];
-            //     const endIndex = group[group.length - 1];
-        
-            //     const subMesh = new SubMesh(
-            //         1, // Material index
-            //         0, // Vertex start
-            //         this.sphere.getTotalVertices(), // Vertex count
-            //         startIndex, // Index start
-            //         endIndex - startIndex + 1, // Index count
-            //         this.sphere
-            //     );
-            // });
-
-                // indicesToProcess = this.getHiddenIndices(visibleIndices)
-
-
-        // }
-
 
         return true
-
-        // setTimeout(() => {
-        //     this.highlightFacesFacingCamera()
-        // }, 2000)
     }
 
     private highlightFace(faceIndex: number): void {
