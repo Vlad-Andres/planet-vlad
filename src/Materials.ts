@@ -5,9 +5,11 @@ import {
     Texture,
     Material,
     PBRMaterial,
+    MultiMaterial
 } from 'babylonjs'
 export class Materials {
     private static materials: (PBRMaterial|Material)[] = []
+    private static multiMaterial: MultiMaterial
     private static sphereUVScale: Vector2 = Vector2.FromArray([5, 5]);
     private scene: Scene
     private assets: string[] = [
@@ -20,6 +22,15 @@ export class Materials {
         this.assets.forEach(asset => {
             Materials.materials.push(this.getPBR(asset))
         });
+        this.setMultiMaterial()
+    }
+
+    private setMultiMaterial(): void {
+        const multiMaterial = new MultiMaterial("multiMaterial", this.scene);
+        for (let i = 0; i < Materials.getMaterialsCount(); i++) {
+            multiMaterial.subMaterials.push(Materials.get(i))
+        }
+        Materials.multiMaterial = multiMaterial
     }
 
     getPBR(asset: string): PBRMaterial {
@@ -105,5 +116,9 @@ export class Materials {
 
     public static getMaterialsCount(): number {
         return Materials.materials.length
+    }
+
+    public static getMultiMaterial(): MultiMaterial {
+        return Materials.multiMaterial
     }
 }

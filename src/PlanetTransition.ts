@@ -23,53 +23,32 @@ import {
     IndicesArray
 } from 'babylonjs'
 import { Materials } from './Materials';
+/**
+ * Class to run a transition from a current material to another one.
+ * The new material should also be associated with some additional meshes
+ */
 export class PlanetTransition {
-    private scene: Scene
-    private sphere: Mesh
     private currentIndex: number = 0
-    private engine: Engine
-    private camera: ArcRotateCamera
+    public static transitionRunning: boolean = false
+    public static currentlyHiding: boolean = false
+    public static processedFaces: number[] = []
+
 
     constructor(sphere: Mesh) {
-        this.sphere = sphere
-        this.scene = this.sphere.getScene()
-        this.engine = this.scene.getEngine()
-        this.camera = this.scene.activeCamera as ArcRotateCamera
+        sphere.material = Materials.getMultiMaterial()
 
-        // Apply initial material
-        this.sphere.material = this.getMultiMaterial()
-        
-        // Start the transition after a delay
-
-        
-
-        // setTimeout(() => {
-            this.transitToMaterial(1)
-        // }, 200)
-
-        this.scene.registerAfterRender(() => {
-            this.camera.alpha -= 0.001
-            this.camera.beta += 0.001
-        })
+        // this.transitToMaterial(1)
     }
 
-    private getMultiMaterial(): MultiMaterial {
-        const multiMaterial = new MultiMaterial("multiMaterial", this.scene);
-        for (let i = 0; i < Materials.getMaterialsCount(); i++) {
-            multiMaterial.subMaterials.push(Materials.get(i))
-        }
-
-        return multiMaterial
-    }
-
-    private processHiddenIndices(fromIndices: IndicesArray, processedFaces: number[] = []): {
+    private static processHiddenIndices(sphere: Mesh, scene: Scene, fromIndices: IndicesArray, processedFaces: number[] = []): {
         hidden: number[],
         visible: number[],
-        faces: number[] 
+        faces: number[]
     } {
+        this.currentlyHiding = true
         const totalFaces = fromIndices.length / 3;
         const indices = fromIndices;
-        const vertices = this.sphere.getVerticesData(VertexBuffer.PositionKind)!;
+        const vertices = sphere.getVerticesData(VertexBuffer.PositionKind)!;
         const nonVisibleIndices: number[] = [];
         const visibleIndices: number[] = [];
     
@@ -102,53 +81,57 @@ export class PlanetTransition {
                 new Vector3(vertex2[0], vertex2[1], vertex2[2])  // Vertex 2
             ];
     
-            const isVisible = this.isFaceFacingCamera(this.scene.activeCamera! as ArcRotateCamera, positions);
+            const isVisible = this.isFaceFacingCamera(scene.activeCamera! as ArcRotateCamera, positions);
             
             if (!isVisible && !processedFaces.includes(i)) {
-                this.highlightFace(i);
+                this.highlightFace(scene, sphere, i);
                 processedFaces.push(i)
                 nonVisibleIndices.push(vertexIndex0, vertexIndex1, vertexIndex2);
             } else {
                 visibleIndices.push(vertexIndex0, vertexIndex1, vertexIndex2);
             }
         }
-    
+        this.currentlyHiding = false
         return { hidden: nonVisibleIndices, visible: visibleIndices, faces: processedFaces };
     }
     
-    private transitToMaterial(materialIndex: number):boolean {
-        const indices = this.sphere.getIndices()!
-        const totalFaces = indices.length / 3;
-        let processedFaces: number[] = []
-        let processedIndices: number[] = []
-        let visibleIndices = indices
-        // processedIndices = this.processHiddenIndices(indices)
+    public static start(materialIndex: number, scene: Scene): void {
+        const sphere = scene.getMeshByName("planet") as Mesh;
 
-        const interval = setInterval(() => {
-            let resultOfProcessing = this.processHiddenIndices(indices, processedFaces)
-            processedIndices.push(...resultOfProcessing.hidden)
-            processedFaces = resultOfProcessing.faces
-            console.log('Running')
+        this.processHiddenIndices(sphere, scene, [])
 
-            // console.log(processedIndices.length +' of ' + indices.length + ' left: '+ visibleIndices.length)
-            // Get the indices other than those processed from all
-            visibleIndices = resultOfProcessing.visible
-            console.log('Still ' + processedFaces.length + ' left' + totalFaces)
-            // Stop the interval when the array is empty
-            if (processedFaces.length === totalFaces) {
-                clearInterval(interval);
-                console.log("Array is empty. Stopping...");
-            }
-        }, 1000); // Execute every 1 second
+        this.transitionRunning = true
+        this.transitHiddenFaces(scene)
 
-        return true
+        // const interval = setInterval(() => {
+            
+        // }, 1000); // Execute every 1 second
+
+        // return true
     }
 
-    private highlightFace(faceIndex: number): void {
-        const indices = this.sphere.getIndices()!
-        const vertices = this.sphere.getVerticesData(VertexBuffer.PositionKind)!
-        const sphere = this.sphere!
-        sphere
+    public static transitHiddenFaces(scene: Scene): void {
+        const sphere = scene.getMeshByName("planet") as Mesh;
+        const indices = sphere.getIndices()!
+        const totalFaces = indices.length / 3;
+        // let processedIndices: number[] = []
+        let visibleIndices = indices
+        let resultOfProcessing = this.processHiddenIndices(sphere, scene, indices, this.processedFaces)
+        // processedIndices.push(...resultOfProcessing.hidden)
+        this.processedFaces = resultOfProcessing.faces
+
+        visibleIndices = resultOfProcessing.visible
+        console.log("Visible indices: ", visibleIndices.length, "Total faces: ", totalFaces, "Processed faces: ", this.processedFaces.length, )
+        // Stop the interval when the array is empty
+        if (this.processedFaces.length === totalFaces) {
+            console.log("Array is empty. Stopping...");
+            this.transitionRunning = false
+        }
+    }
+
+    private static highlightFace(scene: Scene, sphere: Mesh, faceIndex: number): void {
+        const indices = sphere.getIndices()!
+        const vertices = sphere.getVerticesData(VertexBuffer.PositionKind)!
         
         if (!indices || !vertices) return;
         
@@ -183,7 +166,7 @@ export class PlanetTransition {
                 new Color4(1, 0, 0, 1),
                 new Color4(1, 0, 0, 1)
             ]
-        }, this.scene);
+        }, scene);
     }
     
     // Helper function to calculate the face normal
@@ -197,7 +180,7 @@ export class PlanetTransition {
         );
     }
 
-    private isFaceFacingCamera(camera: ArcRotateCamera, positions: Vector3[]): boolean {
+    private static isFaceFacingCamera(camera: ArcRotateCamera, positions: Vector3[]): boolean {
         // Calculate the face normal
         const edge1 = positions[1].subtract(positions[0]);
         const edge2 = positions[2].subtract(positions[0]);

@@ -17,6 +17,7 @@ export class AppOne {
     scene: Scene;
     planet!: Mesh;
     camera!: FollowCamera;
+    playerMovement: PlayerMovement
 
     materials: PBRMaterial[] = [];
     currentMaterialIndex = 0;
@@ -28,9 +29,11 @@ export class AppOne {
         });
         this.scene = this.createScene(this.engine)
         this.createEnvironment()
-        new PlayerMovement(this.planet, this.scene)
+        this.playerMovement = new PlayerMovement(this.planet, this.scene)
         this.setupCamera()
-        new PlanetTransition(this.planet)
+        // new PlanetTransition(this.planet)
+        // TODO: remove
+        PlanetTransition.start(1, this.scene)
     }
 
     debug(debugOn: boolean = true) {
@@ -42,7 +45,7 @@ export class AppOne {
     }
 
     run() {
-        this.debug(false);
+        this.debug(true);
         this.engine.runRenderLoop(() => {
             this.scene.render();
         });
@@ -76,39 +79,27 @@ export class AppOne {
     }
 
     setupCamera(): void {
-        // Instead of creating the camera with a fixed target,
-        // create it and then parent it to the player.
-        // this.camera = new ArcRotateCamera("camera", -Math.PI/2, Math.PI/8, 10, Vector3.Zero(), this.scene);
-
-        // this.camera = new FollowCamera("camera", new Vector3(-Math.PI/2, Math.PI/8, 6), this.scene);
-        this.camera = new FollowCamera("camera", new Vector3(-Math.PI/2, Math.PI/8, 6), this.scene);
-
-        // The goal distance of camera from target
-        // camera.radius = 10;
-
-
-        // this.camera.parent = this.player;  // The camera now moves with the player.
-        // Set the camera's local position relative to the player:
-        // this.camera.position = new Vector3(0, 3, -8); // adjust as needed
-        // Optionally, force the camera to look at the player:
-        // this.camera.setTarget(this.player.position);
+        this.camera = new FollowCamera("camera", new Vector3(-Math.PI/2, Math.PI/4, 6), this.scene);        
         const player = this.scene.getMeshByName("player") as Mesh;
 
-        // Set the camera's target to the player
+        const cameraDistance = 12;
         this.camera.lockedTarget = player;
+        this.camera.radius = cameraDistance;
+        this.camera.heightOffset = 4;
+        this.camera.cameraAcceleration = 0.05;
+        this.camera.maxCameraSpeed = 20;
+        this.camera.attachControl();
 
-        // Smooth follow and update each frame
-        this.scene.registerBeforeRender(() => {
-            // Calculate the direction from the planet's center to the player
-            const playerDirection = player.position.subtract(this.planet.position).normalize();
+        // Keep camera's position and orientation stable using player's heading and up vector
+        this.scene.onBeforeRenderObservable.add(() => {
+            const playerUp = player.position.subtract(this.planet.position).normalize();
+            const playerForward = this.playerMovement.getCurrentHeading();
+            const playerRight = Vector3.Cross(playerForward, playerUp).normalize();
+            const adjustedForward = Vector3.Cross(playerUp, playerRight).normalize();
 
-            // Set the camera's position to be behind the player, at a fixed distance
-            const cameraDistance = 10; // Adjust as needed
-            const cameraOffset = playerDirection.scale(cameraDistance); // Negative to position behind the player
+            const cameraOffset = adjustedForward.scale(-cameraDistance);
             this.camera.position = player.position.add(cameraOffset);
-
-            // Ensure the camera looks at the player
-            this.camera.setTarget(player.position);
+            this.camera.upVector = Vector3.Lerp(this.camera.upVector, playerUp, 0.1); // Smooth transition
         });
     }
 }

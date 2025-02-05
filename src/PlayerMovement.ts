@@ -16,10 +16,18 @@ import {
     FollowCamera,
 } from 'babylonjs'
 import { Materials } from './Materials';
+import { PlanetTransition } from './PlanetTransition';
 export class PlayerMovement {
     player!: Mesh;
     playerHeading!: Vector3;  // NEW: player's current tangent heading
     planet!: Mesh;
+    private moveDirection = Vector3.Zero();
+    private readonly MOVE_SPEED = 0.05;
+    private keysPressed: Set<string> = new Set();
+    static playerUP: Vector3 = Vector3.Zero();
+    private lastActionTime: number = 0;  // Track last action time
+    private readonly ACTION_DELAY: number = 1000;  // Delay in milliseconds
+
 
     constructor(planet: Mesh, scene: Scene) {
         this.planet = planet
@@ -36,70 +44,79 @@ export class PlayerMovement {
         // Compute player's "up" vector from planet center
         const up = this.player.position.subtract(this.planet.position).normalize();
         // Choose a reference vector that's not collinear with 'up' (for example, global Y)
-        let ref = new Vector3(0, 1, 0);
-        if (Math.abs(Vector3.Dot(ref, up)) > 0.99) {
-            ref = new Vector3(1, 0, 0);
-        }
+        const ref = Math.abs(Vector3.Dot(Vector3.Up(), up)) > 0.99 ? Vector3.Right() : Vector3.Up();
+
         // Set the initial heading as the cross product (which lies in the tangent plane)
         this.playerHeading = Vector3.Cross(up, ref).normalize();
     }
 
+    private runTransitionIfApplicable(scene: Scene): void {
+        const currentTime = Date.now();
+        // let actionPerformed = false;
+        if (currentTime - this.lastActionTime < this.ACTION_DELAY) {
+            return; // Skip if not enough time has passed
+        }
+        if (PlanetTransition.transitionRunning && !PlanetTransition.currentlyHiding) {
+            console.log('running')
+            this.lastActionTime = currentTime;
+            PlanetTransition.transitHiddenFaces(scene)
+        }
+        
+        // if (actionPerformed) {
+        // }
+    }
+
     // Assume playerHeading is already defined and normalized.
     private setupControls(scene: Scene): void {
-        const moveSpeed = 0.1;      // arc length (in world units) per key press
-        const rotationSpeed = 0.05; // for rotating the heading with A/D keys
-
-        // Use key events to accumulate movement commands.
         scene.onKeyboardObservable.add((kbInfo) => {
-            if (kbInfo.type !== KeyboardEventTypes.KEYDOWN) return;
+            this.runTransitionIfApplicable(scene)
             const key = kbInfo.event.key.toLowerCase();
+            if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
+                this.keysPressed.add(key);
+            } else if (kbInfo.type === KeyboardEventTypes.KEYUP) {
+                this.keysPressed.delete(key);
+            }
+        });
 
-            if (key === 'w') {
-                // Move forward along the current heading.
-                this.movePlayerArc(moveSpeed);
-            } else if (key === 's') {
-                // Move backward (negative arc length).
-                this.movePlayerArc(-moveSpeed);
-            } else if (key === 'a') {
-                // Rotate the heading left around the player's radial axis by a fixed angle.
-                this.rotatePlayerHeading(rotationSpeed);
-            } else if (key === 'd') {
-                // Rotate the heading right (negative rotation).
-                this.rotatePlayerHeading(-rotationSpeed);
+        scene.onBeforeRenderObservable.add(() => {
+            if (this.keysPressed.has('w')) {
+                this.movePlayerArc(this.MOVE_SPEED);
+            }
+            if (this.keysPressed.has('s')) {
+                this.movePlayerArc(-this.MOVE_SPEED);
+            }
+            if (this.keysPressed.has('a')) {
+                this.rotatePlayerHeading(0.05);
+            }
+            if (this.keysPressed.has('d')) {
+                this.rotatePlayerHeading(-0.05);
             }
         });
     }
 
-    // Moves the player by rotating its position on the sphere by an angle d = s / R.
-    private movePlayerArc(s: number): void {
-        const planetRadius = this.planet.scaling.x * 4; // your planet's radius
-        // d is the rotation angle in radians (arc length divided by radius)
-        const d = s / planetRadius;
-
-        // Compute the radial vector from the planet center to the player.
-        const p = this.player.position.subtract(this.planet.position); // length should be ~planetRadius
-        // Compute the rotation axis: cross(p, heading) ensures rotation in the direction of the heading.
-        const axis = Vector3.Cross(p, this.playerHeading).normalize();
-
-        // Create a rotation matrix to rotate by angle d about the axis.
-        const rotMatrix = Matrix.RotationAxis(axis, d);
-
-        // Rotate the radial vector.
-        const newP = Vector3.TransformCoordinates(p, rotMatrix);
-        // Update the player position:
-        this.player.position = this.planet.position.add(newP);
-
-        // Also rotate the player's heading so it stays tangent.
-        this.playerHeading = Vector3.TransformCoordinates(this.playerHeading, rotMatrix).normalize();
+    private movePlayerArc(speed: number): void {
+        const planetRadius = this.planet.scaling.x * 4;
+        const angle = speed / planetRadius;
+        
+        const radialAxis = this.player.position.subtract(this.planet.position).normalize();
+        const rotationAxis = Vector3.Cross(radialAxis, this.playerHeading).normalize();
+        const rotationMatrix = Matrix.RotationAxis(rotationAxis, angle);
+        
+        const currentPosition = this.player.position.subtract(this.planet.position);
+        const newPosition = Vector3.TransformCoordinates(currentPosition, rotationMatrix);
+        
+        this.player.position = this.planet.position.add(newPosition);
+        this.playerHeading = Vector3.TransformCoordinates(this.playerHeading, rotationMatrix).normalize();
     }
 
-    // Rotates the player's heading vector without moving the position.
-    // The rotation is about the player's local up (radial) axis.
     private rotatePlayerHeading(angle: number): void {
-        // Compute the radial "up" vector at the player.
         const up = this.player.position.subtract(this.planet.position).normalize();
-        // Rotate the heading around the up vector.
-        const rotMatrix = Matrix.RotationAxis(up, angle);
-        this.playerHeading = Vector3.TransformCoordinates(this.playerHeading, rotMatrix).normalize();
+        PlayerMovement.playerUP = up
+        const rotationMatrix = Matrix.RotationAxis(up, angle);
+        this.playerHeading = Vector3.TransformCoordinates(this.playerHeading, rotationMatrix).normalize();
+    }
+
+    public getCurrentHeading(): Vector3 {
+        return this.playerHeading
     }
 }
