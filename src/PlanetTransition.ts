@@ -32,13 +32,28 @@ export class PlanetTransition {
     public static transitionRunning: boolean = false
     public static currentlyHiding: boolean = false
     public static processedFaces: number[] = []
+    public static sphere: Mesh
+    public static debug: boolean = false
 
 
-    constructor(sphere: Mesh) {
-        sphere.material = Materials.getMultiMaterial()
-
+    constructor(sphere: Mesh, debug: boolean) {
+        // sphere.material = Materials.getMultiMaterial()
+        sphere.material = this.getMultiMaterial(sphere.getScene())
+        PlanetTransition.sphere = sphere
+        PlanetTransition.debug = debug
         // this.transitToMaterial(1)
     }
+
+    private getMultiMaterial(scene: Scene): MultiMaterial {
+        const multiMaterial = new MultiMaterial("multiMaterial", scene);
+        for (let i = 0; i < Materials.getMaterialsCount(); i++) {
+            multiMaterial.subMaterials.push(Materials.get(i))
+        }
+
+        return multiMaterial
+    }
+
+    
 
     private static processHiddenIndices(sphere: Mesh, scene: Scene, fromIndices: IndicesArray, processedFaces: number[] = []): {
         hidden: number[],
@@ -96,22 +111,15 @@ export class PlanetTransition {
     }
     
     public static start(materialIndex: number, scene: Scene): void {
-        const sphere = scene.getMeshByName("planet") as Mesh;
+        const sphere = scene.getMeshByName('planet') as Mesh;
 
         this.processHiddenIndices(sphere, scene, [])
 
         this.transitionRunning = true
-        this.transitHiddenFaces(scene)
-
-        // const interval = setInterval(() => {
-            
-        // }, 1000); // Execute every 1 second
-
-        // return true
     }
 
     public static transitHiddenFaces(scene: Scene): void {
-        const sphere = scene.getMeshByName("planet") as Mesh;
+        const sphere = PlanetTransition.sphere!
         const indices = sphere.getIndices()!
         const totalFaces = indices.length / 3;
         // let processedIndices: number[] = []
@@ -121,7 +129,7 @@ export class PlanetTransition {
         this.processedFaces = resultOfProcessing.faces
 
         visibleIndices = resultOfProcessing.visible
-        console.log("Visible indices: ", visibleIndices.length, "Total faces: ", totalFaces, "Processed faces: ", this.processedFaces.length, )
+        // console.log("Visible indices: ", visibleIndices.length, "Total faces: ", totalFaces, "Processed faces: ", this.processedFaces.length, )
         // Stop the interval when the array is empty
         if (this.processedFaces.length === totalFaces) {
             console.log("Array is empty. Stopping...");
@@ -142,8 +150,6 @@ export class PlanetTransition {
             new Vector3(vertices[indices[i + 2] * 3], vertices[indices[i + 2] * 3 + 1], vertices[indices[i + 2] * 3 + 2])
         ];
 
-        // Create submesh for the face
-        // TODO: Replace this by using groups of ascending continuous indices
         new SubMesh(
             1,  // material index
             0,  // vertex start
@@ -154,30 +160,19 @@ export class PlanetTransition {
         );
 
         // Create submesh for the remaining faces
-        
-        const redColor = new Color4(1, 0, 0, 1);
+        if (this.debug) {
+            // Create highlight lines
+            MeshBuilder.CreateLines("highlight", {
+                points: [...positions, positions[0]],
+                colors: [
+                    new Color4(1, 1, 0, 1),
+                    new Color4(1, 0, 1, 1),
+                    new Color4(0, 1, 0, 1),
+                    new Color4(0, 0, 1, 1)
+                ]
+            }, scene);
+        }
 
-        // Create highlight lines
-        const lines = MeshBuilder.CreateLines("highlight", {
-            points: [...positions, positions[0]],
-            colors: [
-                new Color4(1, 0, 0, 1),
-                new Color4(1, 0, 0, 1),
-                new Color4(1, 0, 0, 1),
-                new Color4(1, 0, 0, 1)
-            ]
-        }, scene);
-    }
-    
-    // Helper function to calculate the face normal
-    private isFaceInFrustum(camera: ArcRotateCamera, positions: Vector3[]): boolean {
-        // Get the frustum planes from the camera
-        const frustumPlanes = Frustum.GetPlanes(camera.getViewMatrix().multiply(camera.getProjectionMatrix()));
-    
-        // Check if all vertices of the face are within the frustum
-        return positions.every(pos => 
-            Frustum.IsPointInFrustum(pos, frustumPlanes)
-        );
     }
 
     private static isFaceFacingCamera(camera: ArcRotateCamera, positions: Vector3[]): boolean {
@@ -186,63 +181,17 @@ export class PlanetTransition {
         const edge2 = positions[2].subtract(positions[0]);
         const faceNormal = Vector3.Cross(edge1, edge2).normalize();
     
-        // Calculate the camera direction (from face to camera)
-        const faceCenter = positions.reduce((acc, pos) => acc.add(pos), new Vector3(0, 0, 0)).scaleInPlace(1 / 3);
-        const cameraDirection = camera.position.subtract(faceCenter).normalize();
-    
-        // Check if the face is facing the camera
-        const dotProduct = Vector3.Dot(faceNormal, cameraDirection);
-        return dotProduct < 0;
-    }
-
-    private getAscendingSubGroupsFromArray(indices: number[]): number[][] {
-        const sortedArr = [...new Set(indices)].sort((a, b) => a - b); // Remove duplicates and sort
-        const groups: number[][] = [];
-        let currentGroup: number[] = [];
-
-        for (let i = 0; i < sortedArr.length; i++) {
-            if (currentGroup.length === 0 || sortedArr[i] === currentGroup[currentGroup.length - 1] + 1) {
-                currentGroup.push(sortedArr[i]);
-            } else {
-                groups.push(currentGroup);
-                currentGroup = [sortedArr[i]];
+        // Calculate visibility for each vertex
+        let visibleVertices = 0;
+        for (const position of positions) {
+            const vertexToCamera = camera.position.subtract(position).normalize();
+            const vertexDotProduct = Vector3.Dot(faceNormal, vertexToCamera);
+            if (vertexDotProduct < -0.1) { // Using a small threshold to ensure better visibility detection
+                visibleVertices++;
             }
         }
     
-        if (currentGroup.length > 0) {
-            groups.push(currentGroup);
-        }
-    
-        return groups;
-    }
-
-    /**
-     * Groups an array of indices into contiguous ascending sequences.
-     */
-    private groupAscendingSequences(indices: number[]): number[][] {
-        const groups: number[][] = [];
-        let currentGroup: number[] = [];
-
-        for (let i = 0; i < indices.length; i += 3) {
-            if (currentGroup.length === 0) {
-                currentGroup.push(indices[i], indices[i + 1], indices[i + 2]);
-            } else {
-                // Check if this face's indices are contiguous and ascending
-                const lastIndex = currentGroup[currentGroup.length - 1];
-                if (indices[i] > lastIndex && indices[i + 1] > indices[i] && indices[i + 2] > indices[i + 1]) {
-                    currentGroup.push(indices[i], indices[i + 1], indices[i + 2]);
-                } else {
-                    groups.push([...currentGroup]);
-                    currentGroup = [indices[i], indices[i + 1], indices[i + 2]];
-                }
-            }
-        }
-
-        // Push the final group
-        if (currentGroup.length > 0) {
-            groups.push(currentGroup);
-        }
-
-        return groups;
+        // Face is considered visible if any of its vertices are visible
+        return visibleVertices > 0;
     }
 }

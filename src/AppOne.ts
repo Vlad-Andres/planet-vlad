@@ -31,7 +31,7 @@ export class AppOne {
         this.createEnvironment()
         this.playerMovement = new PlayerMovement(this.planet, this.scene)
         this.setupCamera()
-        // new PlanetTransition(this.planet)
+        new PlanetTransition(this.planet, false)
         // TODO: remove
         PlanetTransition.start(1, this.scene)
     }
@@ -45,7 +45,7 @@ export class AppOne {
     }
 
     run() {
-        this.debug(true);
+        this.debug(false);
         this.engine.runRenderLoop(() => {
             this.scene.render();
         });
@@ -64,7 +64,7 @@ export class AppOne {
     createEnvironment(): void {
         const scene = this.scene
         // Create planet
-        this.planet = MeshBuilder.CreateSphere('planet', { diameter: 8, segments: 8, updatable:true }, scene)
+        this.planet = MeshBuilder.CreateSphere('planet', { diameter: 8, segments: 32, updatable:true }, scene)
         this.planet.position = Vector3.Zero()
 
         const asset = 'brick'
