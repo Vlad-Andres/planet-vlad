@@ -8,10 +8,13 @@ import {
     PBRMaterial,
     Mesh,
     FollowCamera,
-} from 'babylonjs'
+    Matrix,
+    Quaternion
+} from '@babylonjs/core'
 import { Materials } from './Materials';
 import { PlanetTransition } from './PlanetTransition';
 import { PlayerMovement } from './PlayerMovement';
+import { MeshLoader } from './MeshLoader';
 export class AppOne {
     engine: Engine;
     scene: Scene;
@@ -34,6 +37,7 @@ export class AppOne {
         new PlanetTransition(this.planet, false)
         // TODO: remove
         PlanetTransition.start(1, this.scene)
+        this.loadMeshes(this.scene, this.planet)
     }
 
     debug(debugOn: boolean = true) {
@@ -61,6 +65,22 @@ export class AppOne {
         return scene
     }
 
+    private async loadMeshes(scene: Scene, planet: Mesh): Promise<void> {
+        // First load all tree models
+        await MeshLoader.loadTreeModels(scene);
+
+        const treeMesh = MeshLoader.getTreeMesh("winter-tree1");
+        if (treeMesh) {
+            // Register the material-mesh association as before
+            PlanetTransition.registerMaterialMeshAssociation(
+                1,  // forest material index
+                treeMesh as Mesh,
+                2,  // density
+                0.15 // random offset
+            );
+        }
+    }
+
     createEnvironment(): void {
         const scene = this.scene
         // Create planet
@@ -68,14 +88,14 @@ export class AppOne {
         this.planet.position = Vector3.Zero()
 
         const asset = 'brick'
-        this.planet.applyDisplacementMap('public/displacement-models/'+ asset +'/height.png', 0, 1, undefined, undefined, Materials.getScale());
+        this.planet.applyDisplacementMap('displacement-models/'+ asset +'/height.png', 0, 1, undefined, undefined, Materials.getScale());
         // var material = new StandardMaterial("kosh", scene);
 
         new Materials(this.scene)
         // new PlanetTransition(this.planet)
 
-        // material.wireframe = true;
         this.planet.material = Materials.get(0)
+        this.planet!.material!.wireframe = true;
     }
 
     setupCamera(): void {

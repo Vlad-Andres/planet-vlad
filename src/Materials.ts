@@ -6,7 +6,7 @@ import {
     Material,
     PBRMaterial,
     MultiMaterial
-} from 'babylonjs'
+} from '@babylonjs/core'
 export class Materials {
     private static materials: (PBRMaterial|Material)[] = []
     private static multiMaterial: MultiMaterial
@@ -20,7 +20,7 @@ export class Materials {
     constructor(scene: Scene) {
         this.scene = scene
         this.assets.forEach(asset => {
-            Materials.materials.push(this.getPBR(asset))
+            Materials.materials.push(this.getMaterial(asset))
         });
         this.setMultiMaterial()
     }
@@ -39,15 +39,15 @@ export class Materials {
         const texturesArray: Texture[] = []
 
         // Load displacement map
-        const albedo = new Texture('public/displacement-models/'+ asset + '/albedo.png', this.scene)
+        const albedo = new Texture('displacement-models/'+ asset + '/albedo.png', this.scene)
         texturesArray.push(albedo)
-        const normal = new Texture('public/displacement-models/'+ asset +'/normal.png', this.scene)
+        const normal = new Texture('displacement-models/'+ asset +'/normal.png', this.scene)
         texturesArray.push(normal)
-        const roughness = new Texture('public/displacement-models/'+ asset +'/roughness.png', this.scene)
+        const roughness = new Texture('displacement-models/'+ asset +'/roughness.png', this.scene)
         texturesArray.push(roughness)
-        const ambientOcclusion = new Texture('public/displacement-models/'+ asset +'/ambientOcclusion.png', this.scene)
+        const ambientOcclusion = new Texture('displacement-models/'+ asset +'/ambientOcclusion.png', this.scene)
         texturesArray.push(ambientOcclusion)
-        const metallic = new Texture('public/displacement-models/'+ asset +'/metallic.png', this.scene)
+        const metallic = new Texture('displacement-models/'+ asset +'/metallic.png', this.scene)
         texturesArray.push(metallic)
 
         texturesArray.forEach(texture => {
@@ -78,15 +78,15 @@ export class Materials {
         const texturesArray: Texture[] = []
 
         // Load displacement map
-        const baseColor = new Texture('public/displacement-models/'+ asset +'/base.png', this.scene)
+        const baseColor = new Texture('displacement-models/'+ asset +'/base.png', this.scene)
         texturesArray.push(baseColor)
-        const normal = new Texture('public/displacement-models/'+ asset +'/normal.png', this.scene)
+        const normal = new Texture('displacement-models/'+ asset +'/normal.png', this.scene)
         texturesArray.push(normal)
-        const roughness = new Texture('public/displacement-models/'+ asset +'/roughness.png', this.scene)
+        const roughness = new Texture('displacement-models/'+ asset +'/roughness.png', this.scene)
         texturesArray.push(roughness)
-        const ambientOcclusion = new Texture('public/displacement-models/'+ asset +'/ambientOcclusion.png', this.scene)
+        const ambientOcclusion = new Texture('displacement-models/'+ asset +'/ambientOcclusion.png', this.scene)
         texturesArray.push(ambientOcclusion)
-        const displacement = new Texture('public/displacement-models/'+ asset +'/height.png', this.scene)
+        const displacement = new Texture('displacement-models/'+ asset +'/height.png', this.scene)
         texturesArray.push(displacement)
 
         texturesArray.forEach(texture => {

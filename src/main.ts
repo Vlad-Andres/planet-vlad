@@ -6,7 +6,6 @@ window.addEventListener('DOMContentLoaded', () => {
     if (canvasElement instanceof HTMLCanvasElement) {
         let app = new App(canvasElement);
         app.run();
-        app.run();
     } else {
         console.error('renderCanvas element is not a canvas');
     }
