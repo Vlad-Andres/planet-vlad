@@ -14,7 +14,7 @@ import {
     ArcRotateCamera,
     Matrix,
     FollowCamera,
-} from 'babylonjs'
+} from '@babylonjs/core'
 import { Materials } from './Materials';
 import { PlanetTransition } from './PlanetTransition';
 export class PlayerMovement {
