@@ -5,10 +5,8 @@ import {
     Vector3, 
     Mesh,
     AssetContainer,
-    LoadAssetContainerAsync
 } from '@babylonjs/core';
 import '@babylonjs/loaders';
-import { registerBuiltInLoaders } from "@babylonjs/loaders/dynamic";
 
 
 interface TreeModel {
@@ -56,10 +54,18 @@ export class MeshLoader {
 
     private static async loadModel(scene: Scene, model: TreeModel): Promise<void> {
         try {
-            const container = await LoadAssetContainerAsync(
-                model.path + model.file,
-                scene
-            );
+            // const container = await SceneLoader.ImportMeshAsync(
+            //     model.name,
+            //     model.path,
+            //     model.file,
+            //     scene, () => {
+            //         console.log('progress')
+            //     },
+            //     "testName"
+            // );
+
+            const container = await SceneLoader.LoadAssetContainerAsync(
+                model.path + model.file, '', scene)
 
             // Store the container for cleanup if needed
             this.containers.push(container);
@@ -76,7 +82,7 @@ export class MeshLoader {
             // Optimize the mesh for instancing
             rootMesh.setEnabled(false);
             this.optimizeMesh(rootMesh);
-
+            container.addAllToScene()
             // Store the mesh for later use
             this.loadedMeshes.set(model.name, rootMesh);
 

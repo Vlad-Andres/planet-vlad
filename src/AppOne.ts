@@ -9,12 +9,18 @@ import {
     Mesh,
     FollowCamera,
     Matrix,
-    Quaternion
+    Quaternion,
+    SceneLoader
 } from '@babylonjs/core'
+import { GLTFFileLoader } from "@babylonjs/loaders";
 import { Materials } from './Materials';
 import { PlanetTransition } from './PlanetTransition';
 import { PlayerMovement } from './PlayerMovement';
 import { MeshLoader } from './MeshLoader';
+import { Inspector } from '@babylonjs/inspector';
+
+// import * as BABYLON from '@babylonjs/core'; 
+
 export class AppOne {
     engine: Engine;
     scene: Scene;
@@ -35,21 +41,24 @@ export class AppOne {
         this.playerMovement = new PlayerMovement(this.planet, this.scene)
         this.setupCamera()
         new PlanetTransition(this.planet, false)
-        // TODO: remove
         PlanetTransition.start(1, this.scene)
+
+        // registerBuiltInLoaders();
         this.loadMeshes(this.scene, this.planet)
     }
 
     debug(debugOn: boolean = true) {
         if (debugOn) {
-            this.scene.debugLayer.show({ overlay: true });
+            Inspector.Show(this.scene, {});
+
+            // this.scene.debugLayer.show({ overlay: true });
         } else {
             this.scene.debugLayer.hide();
         }
     }
 
     run() {
-        this.debug(false);
+        this.debug(true);
         this.engine.runRenderLoop(() => {
             this.scene.render();
         });
@@ -66,6 +75,9 @@ export class AppOne {
     }
 
     private async loadMeshes(scene: Scene, planet: Mesh): Promise<void> {
+        // await SceneLoader.ImportMeshAsync("", "models/trees/", "winter-tree1.glb", scene);
+
+
         // First load all tree models
         await MeshLoader.loadTreeModels(scene);
 
