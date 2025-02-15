@@ -41,7 +41,6 @@ export class AppOne {
         this.playerMovement = new PlayerMovement(this.planet, this.scene)
         this.setupCamera()
         new PlanetTransition(this.planet, false)
-        PlanetTransition.start(1, this.scene)
 
         // registerBuiltInLoaders();
         this.loadMeshes(this.scene, this.planet)
@@ -75,8 +74,6 @@ export class AppOne {
     }
 
     private async loadMeshes(scene: Scene, planet: Mesh): Promise<void> {
-        // await SceneLoader.ImportMeshAsync("", "models/trees/", "winter-tree1.glb", scene);
-
 
         // First load all tree models
         await MeshLoader.loadTreeModels(scene);
@@ -88,19 +85,6 @@ export class AppOne {
             .registerMaterialMeshAssociation(1, MeshLoader.getMesh("big-tree") as Mesh, 2, -1.6)
         PlanetTransition
             .registerMaterialMeshAssociation(1, MeshLoader.getMesh("tree-simple") as Mesh, 1, 600)
-        
-            // if (treeWinter2Mesh) {
-        //     // Register the material-mesh association as before
-        //     PlanetTransition.registerMaterialMeshAssociation(
-        //         1, treeWinter2Mesh as Mesh, 32, 1.5
-        //     );
-        // }
-        // if (stud) {
-        //     // Register the material-mesh association as before
-        //     PlanetTransition.registerMaterialMeshAssociation(
-        //         1, stud as Mesh, 1032, 78
-        //     );
-        // }
     }
 
     createEnvironment(): void {
@@ -117,7 +101,7 @@ export class AppOne {
         // new PlanetTransition(this.planet)
 
         this.planet.material = Materials.get(0)
-        this.planet!.material!.wireframe = true;
+        // this.planet!.material!.wireframe = true;
     }
 
     setupCamera(): void {

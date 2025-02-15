@@ -10,10 +10,11 @@ import {
 export class Materials {
     private static materials: (PBRMaterial|Material)[] = []
     private static multiMaterial: MultiMaterial
-    private static sphereUVScale: Vector2 = Vector2.FromArray([5, 5]);
+    private static sphereUVScale: Vector2 = Vector2.FromArray([10, 10]);
     private scene: Scene
     private assets: string[] = [
         'stone',
+        'grass',
         'brick',
     ]
 
@@ -88,11 +89,11 @@ export class Materials {
         texturesArray.push(ambientOcclusion)
         const displacement = new Texture('displacement-models/'+ asset +'/height.png', this.scene)
         texturesArray.push(displacement)
-
         texturesArray.forEach(texture => {
             texture.uScale = sphereUVScale.x
             texture.vScale = sphereUVScale.y
         });
+        material.name = asset
 
         material.diffuseTexture = baseColor
         material.bumpTexture = normal

@@ -27,11 +27,17 @@ import {
 import { Materials } from './Materials';
 
 interface MaterialMeshAssociation {
-    materialIndex: number;
-    meshTemplate: Mesh | null;
-    instances: InstancedMesh[];
-    density: number; 
-    verticalOffset: number;
+    materialIndex: number
+    meshTemplate: Mesh | null
+    instances: InstancedMesh[]
+    density: number
+    verticalOffset: number
+}
+
+interface RandomVertexData {
+    liftedPosition: Vector3
+    rotationMatrix: Matrix
+    isTooClose: boolean
 }
 
 /**
@@ -39,7 +45,7 @@ interface MaterialMeshAssociation {
  * The new material should also be associated with some additional meshes
  */
 export class PlanetTransition {
-    private currentIndex: number = 0
+    private static transitingToIndex: number = 0
     public static transitionRunning: boolean = false
     public static currentlyHiding: boolean = false
     public static processedFaces: number[] = []
@@ -139,7 +145,7 @@ export class PlanetTransition {
             if (!isVisible) {
                 nextMaterialVertices.push(...positions);
                 if (!processedFaces.includes(i)) {
-                    this.highlightFace(scene, sphere, i, materialIndex);
+                    this.changeFace(scene, sphere, i, materialIndex);
                     processedFaces.push(i);
                     nonVisibleIndices.push(vertexIndex0, vertexIndex1, vertexIndex2);
 
@@ -177,12 +183,44 @@ export class PlanetTransition {
         return { hidden: nonVisibleIndices, visible: visibleIndices, faces: processedFaces };
     }
 
+    /**
+     * Adds the main landmark, this is the unique mesh associated with the material and it's density is 0
+     * When it's added it's template gets removed so no to add it again
+     * @param association 
+     * @param materialVertices 
+     * @returns 
+     */
     private static addMainLandmark(
         association: MaterialMeshAssociation,
         materialVertices: Vector3[],
     ): void {
-        const randomIndex = Math.floor(Math.random() * materialVertices.length);
-        const randomVertexPosition = materialVertices[randomIndex];
+        const vertex = this.getRandomIndex(materialVertices, association.verticalOffset, 16)
+
+        if (vertex.isTooClose) {
+            console.log('Skipped')
+            return
+        }
+
+        // Add a scale factor
+        const scale = 1; // Adjust this value to control the size
+        const scaleMatrix = Matrix.Scaling(scale, scale, scale);
+        const transitionMatrix = scaleMatrix
+            .multiply(vertex.rotationMatrix)
+            .multiply(Matrix.Translation(
+                vertex.liftedPosition.x,
+                vertex.liftedPosition.y,
+                vertex.liftedPosition.z
+            ));
+        console.log('vertical' + association.verticalOffset)
+        association.meshTemplate!.thinInstanceAdd(transitionMatrix);
+        this.busyPositions.push(vertex.liftedPosition);
+        association.meshTemplate = null
+    }
+
+    private static getRandomIndex(vertices: Vector3[], verticalOffset: number, tooCloseMargin = this.INSTANCE_FREE_RADIUS): RandomVertexData {
+
+        const randomIndex = Math.floor(Math.random() * vertices.length);
+        const randomVertexPosition = vertices[randomIndex];
         const vertexNormal = randomVertexPosition.subtract(Vector3.Zero()).normalize();
 
         // Create rotation matrix to align with surface normal
@@ -196,61 +234,43 @@ export class PlanetTransition {
         }
 
         // Combine transformations: rotate -> translate -> lift
-        const surfaceOffset = association.verticalOffset; // Adjust this value to control how far above the surface
+        const surfaceOffset = verticalOffset; // Adjust this value to control how far above the surface
         const liftedPosition = randomVertexPosition.add(vertexNormal.scale(surfaceOffset));
 
         // Check if position is too close to an existing one
         const isTooClose = this.busyPositions.some(existingPos =>
-            Vector3.Distance(existingPos, liftedPosition) < 15
+            Vector3.Distance(existingPos, liftedPosition) < tooCloseMargin
         );
 
-        if (isTooClose) {
-            console.log('Skipped')
-            return
-        }
-
-        // Add a scale factor
-        const scale = 1; // Adjust this value to control the size
-        const scaleMatrix = Matrix.Scaling(scale, scale, scale);
-        const transitionMatrix = scaleMatrix
-            .multiply(rotationMatrix)
-            .multiply(Matrix.Translation(liftedPosition.x, liftedPosition.y, liftedPosition.z));
-        console.log('vertical' + association.verticalOffset)
-        association.meshTemplate!.thinInstanceAdd(transitionMatrix);
-        this.busyPositions.push(liftedPosition);
-        association.meshTemplate = null
+        return {
+            liftedPosition,
+            rotationMatrix,
+            isTooClose
+        };
     }
 
+    /**
+     * Removes the instances from the previous material
+     * @param materialVertices - vertices to process (usually hidden ones)
+     */
+    private static removeThinInstancesFromPreviousMaterial(materialVertices: Vector3[], verticalOffset: number): void {
+        
+    }
+
+    /**
+     * Adds matterial associated meshes according to the associated density
+     * @param association - Association of the material and the mesh
+     * @param materialVertices - vertices to process (usually hidden ones)
+     */
     private static addThinInstancesForAssociation(
         association: MaterialMeshAssociation,
         materialVertices: Vector3[],
         ): void {
         for (let i = 1; i <= association.density; i++) {
             // Get a random vertex position and its normal
-            const randomIndex = Math.floor(Math.random() * materialVertices.length);
-            const randomVertexPosition = materialVertices[randomIndex];
-            const vertexNormal = randomVertexPosition.subtract(Vector3.Zero()).normalize();
+            const vertex = this.getRandomIndex(materialVertices, association.verticalOffset)
 
-            // Create rotation matrix to align with surface normal
-            const rotationMatrix = Matrix.Identity();
-            const up = Vector3.Up();
-            const angle = Math.acos(Vector3.Dot(up, vertexNormal));
-            const axis = Vector3.Cross(up, vertexNormal).normalize();
-            
-            if (angle !== 0) {
-                Matrix.RotationAxisToRef(axis, angle, rotationMatrix);
-            }
-
-            // Combine transformations: rotate -> translate -> lift
-            const surfaceOffset = association.verticalOffset; // Adjust this value to control how far above the surface
-            const liftedPosition = randomVertexPosition.add(vertexNormal.scale(surfaceOffset));
-
-            // Check if position is too close to an existing one
-            const isTooClose = this.busyPositions.some(existingPos =>
-                Vector3.Distance(existingPos, liftedPosition) < this.INSTANCE_FREE_RADIUS
-            );
-
-            if (isTooClose) {
+            if (vertex.isTooClose) {
                 console.log('Skipped')
                 continue
             }
@@ -259,17 +279,21 @@ export class PlanetTransition {
             const scale = 1; // Adjust this value to control the size
             const scaleMatrix = Matrix.Scaling(scale, scale, scale);
             const transitionMatrix = scaleMatrix
-                .multiply(rotationMatrix)
-                .multiply(Matrix.Translation(liftedPosition.x, liftedPosition.y, liftedPosition.z));
+                .multiply(vertex.rotationMatrix)
+                .multiply(Matrix.Translation(
+                    vertex.liftedPosition.x,
+                    vertex.liftedPosition.y,
+                    vertex.liftedPosition.z
+                ));
 
             association.meshTemplate!.thinInstanceAdd(transitionMatrix);
-            this.busyPositions.push(liftedPosition);
+            this.busyPositions.push(vertex.liftedPosition);
         }
     }
 
     public static start(materialIndex: number, scene: Scene): void {
         const sphere = scene.getMeshByName('planet') as Mesh;
-
+        this.transitingToIndex = materialIndex
         this.processHiddenIndices(sphere, scene, [], [], materialIndex)
 
         this.transitionRunning = true
@@ -280,7 +304,7 @@ export class PlanetTransition {
         const indices = sphere.getIndices()!
         const totalFaces = indices.length / 3;
         // let visibleIndices = indices
-        let resultOfProcessing = this.processHiddenIndices(sphere, scene, indices, this.processedFaces)
+        let resultOfProcessing = this.processHiddenIndices(sphere, scene, indices, this.processedFaces, this.transitingToIndex)
         this.processedFaces = resultOfProcessing.faces
 
         // visibleIndices = resultOfProcessing.visible
@@ -288,11 +312,12 @@ export class PlanetTransition {
         // Stop the interval when the array is empty
         if (this.processedFaces.length === totalFaces) {
             console.log("Array is empty. Stopping...");
+            this.processedFaces = []
             this.transitionRunning = false
         }
     }
 
-    private static highlightFace(scene: Scene, sphere: Mesh, faceIndex: number, materialIndex: number): void {
+    private static changeFace(scene: Scene, sphere: Mesh, faceIndex: number, materialIndex: number): void {
         const indices = sphere.getIndices()!
         const vertices = sphere.getVerticesData(VertexBuffer.PositionKind)!
         
