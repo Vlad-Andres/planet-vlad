@@ -81,14 +81,33 @@ export class AppOne {
         // First load all tree models
         await MeshLoader.loadTreeModels(scene);
 
-        const treeMesh = MeshLoader.getTreeMesh("winter-tree1");
-        if (treeMesh) {
+        const treeWinter1Mesh = MeshLoader.getTreeMesh("winter-tree1");
+        const treeWinter2Mesh = MeshLoader.getTreeMesh("winter-tree2");
+        const treeWinter3Mesh = MeshLoader.getTreeMesh("winter-tree3");
+        const treeWinter4Mesh = MeshLoader.getTreeMesh("winter-tree4");
+
+        if (treeWinter1Mesh) {
             // Register the material-mesh association as before
             PlanetTransition.registerMaterialMeshAssociation(
-                1,  // forest material index
-                treeMesh as Mesh,
-                2,  // density
-                0.15 // random offset
+                1, treeWinter1Mesh as Mesh, 6 
+            );
+        }
+        if (treeWinter2Mesh) {
+            // Register the material-mesh association as before
+            PlanetTransition.registerMaterialMeshAssociation(
+                1, treeWinter2Mesh as Mesh, 1
+            );
+        }
+        if (treeWinter3Mesh) {
+            // Register the material-mesh association as before
+            PlanetTransition.registerMaterialMeshAssociation(
+                1, treeWinter3Mesh as Mesh, 1, 1.5
+            );
+        }
+        if (treeWinter4Mesh) {
+            // Register the material-mesh association as before
+            PlanetTransition.registerMaterialMeshAssociation(
+                1, treeWinter4Mesh as Mesh, 1
             );
         }
     }
