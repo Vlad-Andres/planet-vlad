@@ -81,12 +81,13 @@ export class AppOne {
         // First load all tree models
         await MeshLoader.loadTreeModels(scene);
         
+        PlanetTransition.registerMaterialMainLandmark(1, MeshLoader.getMesh("house") as Mesh, 34)
         PlanetTransition
-            .registerMaterialMeshAssociation(1, MeshLoader.getTreeMesh("tree1") as Mesh, 12, 12)
+            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("tree1") as Mesh, 12, 12)
         PlanetTransition
-            .registerMaterialMeshAssociation(1, MeshLoader.getTreeMesh("big-tree") as Mesh, 2, -1.6)
+            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("big-tree") as Mesh, 2, -1.6)
         PlanetTransition
-            .registerMaterialMeshAssociation(1, MeshLoader.getTreeMesh("tree-simple") as Mesh, 1, 600)
+            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("tree-simple") as Mesh, 1, 600)
         
             // if (treeWinter2Mesh) {
         //     // Register the material-mesh association as before

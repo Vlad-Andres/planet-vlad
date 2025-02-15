@@ -41,13 +41,13 @@ export class MeshLoader {
             scale: 0.006,
             rotationY: Math.PI / 2
         },
-        // {
-        //     name: "winter-tree3",
-        //     path: "./models/trees/",
-        //     file: "winter-tree3.glb",
-        //     scale: 0.8,
-        //     rotationY: Math.PI / 2
-        // },
+        {
+            name: "house",
+            path: "./models/buildings/",
+            file: "house.glb",
+            scale: 0.1,
+            rotationY: Math.PI / 2
+        },
         // {
         //     name: "winter-tree4",
         //     path: "./models/trees/",
@@ -98,7 +98,7 @@ export class MeshLoader {
             if (model.rotationY !== undefined) {
                 mergedMesh.rotation.y = model.rotationY;
             }
-    
+            mergedMesh.flipFaces(true)
             // Remove parent and store the new merged mesh
             mergedMesh.setParent(null);
             parent.dispose();
@@ -125,7 +125,7 @@ export class MeshLoader {
         });
     }
 
-    public static getTreeMesh(name: string): AbstractMesh | undefined {
+    public static getMesh(name: string): AbstractMesh | undefined {
         return this.loadedMeshes.get(name);
     }
 
