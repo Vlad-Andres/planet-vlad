@@ -21,38 +21,45 @@ interface TreeModel {
 export class MeshLoader {
     private static treeModels: TreeModel[] = [
         {
-            name: "winter-tree1",
+            name: "tree1",
             path: "./models/trees/",
-            file: "winter-tree1.glb",
-            scale: 0.8,
+            file: "tree1.glb",
+            scale: 0.25,
             rotationY: Math.PI / 2
         },
         {
-            name: "winter-tree2",
+            name: "big-tree",
             path: "./models/trees/",
-            file: "winter-tree2.glb",
-            scale: 0.8,
+            file: "big-tree.glb",
+            scale: 2,
             rotationY: Math.PI / 2
         },
         {
-            name: "winter-tree3",
+            name: "tree-simple",
             path: "./models/trees/",
-            file: "winter-tree3.glb",
-            scale: 0.8,
-            rotationY: Math.PI / 2
-        },
-        {
-            name: "winter-tree4",
-            path: "./models/trees/",
-            file: "winter-tree4.glb",
-            scale: 0.8,
+            file: "tree-simple.glb",
+            scale: 0.006,
             rotationY: Math.PI / 2
         },
         // {
-        //     name: "oak1",
-        //     path: "/models/trees/",
-        //     file: "oak_tree.glb",
-        //     scale: 1.0
+        //     name: "winter-tree3",
+        //     path: "./models/trees/",
+        //     file: "winter-tree3.glb",
+        //     scale: 0.8,
+        //     rotationY: Math.PI / 2
+        // },
+        // {
+        //     name: "winter-tree4",
+        //     path: "./models/trees/",
+        //     file: "winter-tree4.glb",
+        //     scale: 0.8,
+        //     rotationY: Math.PI / 2
+        // },
+        // {
+        //     name: "stud",
+        //     path: "https://BabylonJS.github.io/Assets/meshes/",
+        //     file: "stud.glb",
+        //     scale: 0.05
         // },
         // Add more tree models as needed
     ];
@@ -78,20 +85,31 @@ export class MeshLoader {
         try {
             const result = await SceneLoader.ImportMeshAsync('', model.path, model.file, scene);
             const parent = result.meshes[0];
-            const newModel = parent.getChildMeshes()[0];
-            newModel.name = model.name;
-            newModel.scaling.scaleInPlace(model.scale);
-            if (model.rotationY !== undefined) {
-                newModel.rotation.y = model.rotationY;
+    
+            // Merge all child meshes while keeping multi-materials
+            const mergedMesh = Mesh.MergeMeshes(parent.getChildMeshes(), true, true, undefined, false, true);
+            if (!mergedMesh) {
+                console.error(`Error merging model ${model.file}`);
+                return;
             }
-            newModel.setParent(null);
+    
+            mergedMesh.name = model.name;
+            mergedMesh.scaling.scaleInPlace(model.scale);
+            if (model.rotationY !== undefined) {
+                mergedMesh.rotation.y = model.rotationY;
+            }
+    
+            // Remove parent and store the new merged mesh
+            mergedMesh.setParent(null);
             parent.dispose();
-            this.loadedMeshes.set(model.name, newModel);
-            this.optimizeMesh(newModel);
+            this.loadedMeshes.set(model.name, mergedMesh);
+            this.optimizeMesh(mergedMesh);
+    
         } catch (error) {
             console.error(`Error loading model ${model.file}:`, error);
         }
     }
+    
 
     private static optimizeMesh(mesh: AbstractMesh): void {
         // Freeze transformations for better performance
