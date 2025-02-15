@@ -119,20 +119,22 @@ export class PlanetTransition {
             const positions = [vertex0, vertex1, vertex2];
             const isVisible = this.isFaceFacingCamera(scene.activeCamera! as ArcRotateCamera, positions);
             
-            if (!isVisible && !processedFaces.includes(i)) {
-                this.highlightFace(scene, sphere, i, materialIndex);
-                processedFaces.push(i);
-                nonVisibleIndices.push(vertexIndex0, vertexIndex1, vertexIndex2);
-
-                // Store vertices and normals for material 1
-                const normal = new Vector3(
-                    normals[vertexIndex0 * 3],
-                    normals[vertexIndex0 * 3 + 1],
-                    normals[vertexIndex0 * 3 + 2]
-                ).normalize();
-                
+            if (!isVisible) {
                 nextMaterialVertices.push(...positions);
-                nextMaterialNormals.push(normal, normal, normal);
+                if (!processedFaces.includes(i)) {
+                    this.highlightFace(scene, sphere, i, materialIndex);
+                    processedFaces.push(i);
+                    nonVisibleIndices.push(vertexIndex0, vertexIndex1, vertexIndex2);
+
+                    // Store vertices and normals for material 1
+                    const normal = new Vector3(
+                        normals[vertexIndex0 * 3],
+                        normals[vertexIndex0 * 3 + 1],
+                        normals[vertexIndex0 * 3 + 2]
+                    ).normalize();
+                    
+                    nextMaterialNormals.push(normal, normal, normal);
+                }
             } else {
                 visibleIndices.push(vertexIndex0, vertexIndex1, vertexIndex2);
             }
@@ -143,7 +145,7 @@ export class PlanetTransition {
             this.materialAssociations.forEach(association => {
                 console.log(association)
                 if (association.materialIndex === materialIndex) {
-                    this.addThinInstancesForAssociation(association, nextMaterialVertices, scene);
+                    this.addThinInstancesForAssociation(association, nextMaterialVertices);
                 }
             });
         }
@@ -155,10 +157,9 @@ export class PlanetTransition {
     private static addThinInstancesForAssociation(
         association: MaterialMeshAssociation,
         materialVertices: Vector3[],
-        scene: Scene
         ): void {
         for (let i = 1; i <= association.density; i++) {
-            console.log(i);
+            console.log(materialVertices.length);
             // Get a random vertex position and its normal
             const randomIndex = Math.floor(Math.random() * materialVertices.length);
             const randomVertexPosition = materialVertices[randomIndex];

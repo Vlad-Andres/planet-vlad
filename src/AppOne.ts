@@ -95,7 +95,7 @@ export class AppOne {
         if (treeWinter2Mesh) {
             // Register the material-mesh association as before
             PlanetTransition.registerMaterialMeshAssociation(
-                1, treeWinter2Mesh as Mesh, 1
+                1, treeWinter2Mesh as Mesh, 1, 1.5
             );
         }
         if (treeWinter3Mesh) {
