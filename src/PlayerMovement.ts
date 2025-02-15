@@ -27,6 +27,7 @@ export class PlayerMovement {
     static playerUP: Vector3 = Vector3.Zero();
     private lastActionTime: number = 0;  // Track last action time
     private readonly ACTION_DELAY: number = 1000;  // Delay in milliseconds
+    private materialIndex: number = 0;
 
 
     constructor(planet: Mesh, scene: Scene) {
@@ -87,6 +88,10 @@ export class PlayerMovement {
             }
             if (this.keysPressed.has('d')) {
                 this.rotatePlayerHeading(-0.05);
+            }
+            if (this.keysPressed.has('n') && !PlanetTransition.transitionRunning) {
+                console.log('Material ' + this.materialIndex)
+                PlanetTransition.start(++this.materialIndex, scene)
             }
         });
     }
