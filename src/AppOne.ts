@@ -80,36 +80,26 @@ export class AppOne {
 
         // First load all tree models
         await MeshLoader.loadTreeModels(scene);
-
-        const treeWinter1Mesh = MeshLoader.getTreeMesh("winter-tree1");
-        const treeWinter2Mesh = MeshLoader.getTreeMesh("winter-tree2");
-        const treeWinter3Mesh = MeshLoader.getTreeMesh("winter-tree3");
-        const treeWinter4Mesh = MeshLoader.getTreeMesh("winter-tree4");
-
-        if (treeWinter1Mesh) {
-            // Register the material-mesh association as before
-            PlanetTransition.registerMaterialMeshAssociation(
-                1, treeWinter1Mesh as Mesh, 6 
-            );
-        }
-        if (treeWinter2Mesh) {
-            // Register the material-mesh association as before
-            PlanetTransition.registerMaterialMeshAssociation(
-                1, treeWinter2Mesh as Mesh, 1, 1.5
-            );
-        }
-        if (treeWinter3Mesh) {
-            // Register the material-mesh association as before
-            PlanetTransition.registerMaterialMeshAssociation(
-                1, treeWinter3Mesh as Mesh, 1, 1.5
-            );
-        }
-        if (treeWinter4Mesh) {
-            // Register the material-mesh association as before
-            PlanetTransition.registerMaterialMeshAssociation(
-                1, treeWinter4Mesh as Mesh, 1
-            );
-        }
+        
+        PlanetTransition
+            .registerMaterialMeshAssociation(1, MeshLoader.getTreeMesh("tree1") as Mesh, 12, 12)
+        PlanetTransition
+            .registerMaterialMeshAssociation(1, MeshLoader.getTreeMesh("big-tree") as Mesh, 2, -1.6)
+        PlanetTransition
+            .registerMaterialMeshAssociation(1, MeshLoader.getTreeMesh("tree-simple") as Mesh, 1, 600)
+        
+            // if (treeWinter2Mesh) {
+        //     // Register the material-mesh association as before
+        //     PlanetTransition.registerMaterialMeshAssociation(
+        //         1, treeWinter2Mesh as Mesh, 32, 1.5
+        //     );
+        // }
+        // if (stud) {
+        //     // Register the material-mesh association as before
+        //     PlanetTransition.registerMaterialMeshAssociation(
+        //         1, stud as Mesh, 1032, 78
+        //     );
+        // }
     }
 
     createEnvironment(): void {

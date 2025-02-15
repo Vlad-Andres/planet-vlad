@@ -46,6 +46,8 @@ export class PlanetTransition {
     public static sphere: Mesh
     public static debug: boolean = false
     private static materialAssociations: MaterialMeshAssociation[] = [];
+    private static busyPositions: Vector3[] = []
+    private static INSTANCE_FREE_RADIUS = 5
 
 
     constructor(sphere: Mesh, debug: boolean) {
@@ -178,10 +180,26 @@ export class PlanetTransition {
             // Combine transformations: rotate -> translate -> lift
             const surfaceOffset = association.verticalOffset; // Adjust this value to control how far above the surface
             const liftedPosition = randomVertexPosition.add(vertexNormal.scale(surfaceOffset));
-            const transitionMatrix = rotationMatrix
+
+            // Check if position is too close to an existing one
+            const isTooClose = this.busyPositions.some(existingPos =>
+                Vector3.Distance(existingPos, liftedPosition) < this.INSTANCE_FREE_RADIUS
+            );
+
+            if (isTooClose) {
+                console.log('Skipped')
+                continue
+            }
+
+            // Add a scale factor
+            const scale = 1; // Adjust this value to control the size
+            const scaleMatrix = Matrix.Scaling(scale, scale, scale);
+            const transitionMatrix = scaleMatrix
+                .multiply(rotationMatrix)
                 .multiply(Matrix.Translation(liftedPosition.x, liftedPosition.y, liftedPosition.z));
 
             association.meshTemplate.thinInstanceAdd(transitionMatrix);
+            this.busyPositions.push(liftedPosition);
         }
     }
 
@@ -197,11 +215,11 @@ export class PlanetTransition {
         const sphere = PlanetTransition.sphere!
         const indices = sphere.getIndices()!
         const totalFaces = indices.length / 3;
-        let visibleIndices = indices
+        // let visibleIndices = indices
         let resultOfProcessing = this.processHiddenIndices(sphere, scene, indices, this.processedFaces)
         this.processedFaces = resultOfProcessing.faces
 
-        visibleIndices = resultOfProcessing.visible
+        // visibleIndices = resultOfProcessing.visible
 
         // Stop the interval when the array is empty
         if (this.processedFaces.length === totalFaces) {
