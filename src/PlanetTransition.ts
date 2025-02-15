@@ -28,10 +28,10 @@ import { Materials } from './Materials';
 
 interface MaterialMeshAssociation {
     materialIndex: number;
-    meshTemplate: Mesh;
+    meshTemplate: Mesh | null;
     instances: InstancedMesh[];
-    density: number; // How many instances per face
-    verticalOffset: number; // Random offset range from vertex position
+    density: number; 
+    verticalOffset: number;
 }
 
 /**
@@ -72,6 +72,21 @@ export class PlanetTransition {
             density,
             verticalOffset
         });
+    }
+
+    public static registerMaterialMainLandmark(
+        materialIndex: number,
+        meshTemplate: Mesh,
+        verticalOffset: number = 2
+    ): void {
+        const density = 0
+        this.materialAssociations.push({
+            materialIndex,
+            meshTemplate,
+            instances: [],
+            density,
+            verticalOffset
+        })
     }
 
     private static processHiddenIndices(
@@ -145,9 +160,15 @@ export class PlanetTransition {
         // Create a single mesh instance for material 1 if we have vertices
         if (nextMaterialVertices.length > 0 && this.materialAssociations.length > 0) {
             this.materialAssociations.forEach(association => {
-                console.log(association)
-                if (association.materialIndex === materialIndex) {
-                    this.addThinInstancesForAssociation(association, nextMaterialVertices);
+                if (association.density !== 0) {
+                    console.log(association)
+                    if (association.materialIndex === materialIndex) {
+                        this.addThinInstancesForAssociation(association, nextMaterialVertices)
+                    }
+                } else { // Load main landmark
+                    if (association.meshTemplate != null) { // not already loaded
+                        this.addMainLandmark(association, nextMaterialVertices)
+                    }
                 }
             });
         }
@@ -156,12 +177,55 @@ export class PlanetTransition {
         return { hidden: nonVisibleIndices, visible: visibleIndices, faces: processedFaces };
     }
 
+    private static addMainLandmark(
+        association: MaterialMeshAssociation,
+        materialVertices: Vector3[],
+    ): void {
+        const randomIndex = Math.floor(Math.random() * materialVertices.length);
+        const randomVertexPosition = materialVertices[randomIndex];
+        const vertexNormal = randomVertexPosition.subtract(Vector3.Zero()).normalize();
+
+        // Create rotation matrix to align with surface normal
+        const rotationMatrix = Matrix.Identity();
+        const up = Vector3.Up();
+        const angle = Math.acos(Vector3.Dot(up, vertexNormal));
+        const axis = Vector3.Cross(up, vertexNormal).normalize();
+        
+        if (angle !== 0) {
+            Matrix.RotationAxisToRef(axis, angle, rotationMatrix);
+        }
+
+        // Combine transformations: rotate -> translate -> lift
+        const surfaceOffset = association.verticalOffset; // Adjust this value to control how far above the surface
+        const liftedPosition = randomVertexPosition.add(vertexNormal.scale(surfaceOffset));
+
+        // Check if position is too close to an existing one
+        const isTooClose = this.busyPositions.some(existingPos =>
+            Vector3.Distance(existingPos, liftedPosition) < 15
+        );
+
+        if (isTooClose) {
+            console.log('Skipped')
+            return
+        }
+
+        // Add a scale factor
+        const scale = 1; // Adjust this value to control the size
+        const scaleMatrix = Matrix.Scaling(scale, scale, scale);
+        const transitionMatrix = scaleMatrix
+            .multiply(rotationMatrix)
+            .multiply(Matrix.Translation(liftedPosition.x, liftedPosition.y, liftedPosition.z));
+        console.log('vertical' + association.verticalOffset)
+        association.meshTemplate!.thinInstanceAdd(transitionMatrix);
+        this.busyPositions.push(liftedPosition);
+        association.meshTemplate = null
+    }
+
     private static addThinInstancesForAssociation(
         association: MaterialMeshAssociation,
         materialVertices: Vector3[],
         ): void {
         for (let i = 1; i <= association.density; i++) {
-            console.log(materialVertices.length);
             // Get a random vertex position and its normal
             const randomIndex = Math.floor(Math.random() * materialVertices.length);
             const randomVertexPosition = materialVertices[randomIndex];
@@ -198,7 +262,7 @@ export class PlanetTransition {
                 .multiply(rotationMatrix)
                 .multiply(Matrix.Translation(liftedPosition.x, liftedPosition.y, liftedPosition.z));
 
-            association.meshTemplate.thinInstanceAdd(transitionMatrix);
+            association.meshTemplate!.thinInstanceAdd(transitionMatrix);
             this.busyPositions.push(liftedPosition);
         }
     }
