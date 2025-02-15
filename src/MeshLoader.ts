@@ -5,6 +5,7 @@ import {
     Vector3, 
     Mesh,
     AssetContainer,
+    VertexBuffer,
 } from '@babylonjs/core';
 import '@babylonjs/loaders';
 
@@ -26,6 +27,27 @@ export class MeshLoader {
             scale: 0.8,
             rotationY: Math.PI / 2
         },
+        {
+            name: "winter-tree2",
+            path: "./models/trees/",
+            file: "winter-tree2.glb",
+            scale: 0.8,
+            rotationY: Math.PI / 2
+        },
+        {
+            name: "winter-tree3",
+            path: "./models/trees/",
+            file: "winter-tree3.glb",
+            scale: 0.8,
+            rotationY: Math.PI / 2
+        },
+        {
+            name: "winter-tree4",
+            path: "./models/trees/",
+            file: "winter-tree4.glb",
+            scale: 0.8,
+            rotationY: Math.PI / 2
+        },
         // {
         //     name: "oak1",
         //     path: "/models/trees/",
@@ -36,7 +58,7 @@ export class MeshLoader {
     ];
 
     private static loadedMeshes: Map<string, AbstractMesh> = new Map();
-    private static containers: AssetContainer[] = [];
+    // private static containers: AssetContainer[] = [];
 
     public static async loadTreeModels(scene: Scene): Promise<void> {
         // registerBuiltInLoaders();
@@ -54,38 +76,18 @@ export class MeshLoader {
 
     private static async loadModel(scene: Scene, model: TreeModel): Promise<void> {
         try {
-            // const container = await SceneLoader.ImportMeshAsync(
-            //     model.name,
-            //     model.path,
-            //     model.file,
-            //     scene, () => {
-            //         console.log('progress')
-            //     },
-            //     "testName"
-            // );
-
-            const container = await SceneLoader.LoadAssetContainerAsync(
-                model.path + model.file, '', scene)
-
-            // Store the container for cleanup if needed
-            this.containers.push(container);
-
-            // Get the root mesh
-            const rootMesh = container.meshes[0];
-            
-            // Apply transformations
-            rootMesh.scaling = new Vector3(model.scale, model.scale, model.scale);
-            if (model.rotationY) {
-                rootMesh.rotation.y = model.rotationY;
+            const result = await SceneLoader.ImportMeshAsync('', model.path, model.file, scene);
+            const parent = result.meshes[0];
+            const newModel = parent.getChildMeshes()[0];
+            newModel.name = model.name;
+            newModel.scaling.scaleInPlace(model.scale);
+            if (model.rotationY !== undefined) {
+                newModel.rotation.y = model.rotationY;
             }
-
-            // Optimize the mesh for instancing
-            rootMesh.setEnabled(false);
-            this.optimizeMesh(rootMesh);
-            container.addAllToScene()
-            // Store the mesh for later use
-            this.loadedMeshes.set(model.name, rootMesh);
-
+            newModel.setParent(null);
+            parent.dispose();
+            this.loadedMeshes.set(model.name, newModel);
+            this.optimizeMesh(newModel);
         } catch (error) {
             console.error(`Error loading model ${model.file}:`, error);
         }
@@ -115,12 +117,4 @@ export class MeshLoader {
         return meshes[randomIndex];
     }
 
-    public static cleanup(): void {
-        // Dispose all containers and their assets
-        this.containers.forEach(container => {
-            container.dispose();
-        });
-        this.containers = [];
-        this.loadedMeshes.clear();
-    }
 }

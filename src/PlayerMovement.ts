@@ -52,7 +52,7 @@ export class PlayerMovement {
 
     private runTransitionIfApplicable(scene: Scene): void {
         const currentTime = Date.now();
-        // let actionPerformed = false;
+
         if (currentTime - this.lastActionTime < this.ACTION_DELAY) {
             return; // Skip if not enough time has passed
         }
@@ -61,9 +61,6 @@ export class PlayerMovement {
             this.lastActionTime = currentTime;
             PlanetTransition.transitHiddenFaces(scene)
         }
-        
-        // if (actionPerformed) {
-        // }
     }
 
     // Assume playerHeading is already defined and normalized.

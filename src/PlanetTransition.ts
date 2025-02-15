@@ -31,7 +31,7 @@ interface MaterialMeshAssociation {
     meshTemplate: Mesh;
     instances: InstancedMesh[];
     density: number; // How many instances per face
-    randomOffset: number; // Random offset range from vertex position
+    verticalOffset: number; // Random offset range from vertex position
 }
 
 /**
@@ -49,8 +49,8 @@ export class PlanetTransition {
 
 
     constructor(sphere: Mesh, debug: boolean) {
-        // sphere.material = Materials.getMultiMaterial()
-        sphere.material = this.getMultiMaterial(sphere.getScene())
+        sphere.material = Materials.getMultiMaterial()
+        // sphere.material = this.getMultiMaterial(sphere.getScene())
         PlanetTransition.sphere = sphere
         PlanetTransition.debug = debug
         // this.transitToMaterial(1)
@@ -61,65 +61,24 @@ export class PlanetTransition {
         materialIndex: number,
         meshTemplate: Mesh,
         density: number = 1,
-        randomOffset: number = 0.1
+        verticalOffset: number = 2
     ): void {
         this.materialAssociations.push({
             materialIndex,
             meshTemplate,
             instances: [],
             density,
-            randomOffset
+            verticalOffset
         });
-        console.log(this.materialAssociations)
     }
 
-    private static createMeshInstance(
-        template: Mesh,
-        position: Vector3,
-        normal: Vector3,
+    private static processHiddenIndices(
+        sphere: Mesh,
         scene: Scene,
-        randomOffset: number
-    ): InstancedMesh {
-        // Add random offset to position
-        const offsetX = (Math.random() - 0.5) * randomOffset;
-        const offsetZ = (Math.random() - 0.5) * randomOffset;
-        const finalPosition = position.add(new Vector3(offsetX, 0, offsetZ));
-
-        // Create rotation matrix to align mesh with surface normal
-        const rotationMatrix = Matrix.Identity();
-        const up = Vector3.Up();
-        const angle = Math.acos(Vector3.Dot(up, normal));
-        const axis = Vector3.Cross(up, normal).normalize();
-        
-        if (angle !== 0) {
-            Matrix.RotationAxisToRef(axis, angle, rotationMatrix);
-        }
-
-        // Create instance and set its position/rotation
-        const instance = template.createInstance(`instance_${Date.now()}_${Math.random()}`);
-        instance.position = finalPosition;
-        
-        // Correct way to convert rotation matrix to quaternion
-        instance.rotationQuaternion = Quaternion.FromRotationMatrix(rotationMatrix);
-
-        // Scale based on distance from sphere center (perspective effect)
-        const distanceFromCenter = Vector3.Distance(Vector3.Zero(), finalPosition);
-        const scale = 0.02 * distanceFromCenter; // Adjust multiplier as needed
-        instance.scaling = new Vector3(scale, scale, scale);
-
-        return instance;
-    }
-
-    private getMultiMaterial(scene: Scene): MultiMaterial {
-        const multiMaterial = new MultiMaterial("multiMaterial", scene);
-        for (let i = 0; i < Materials.getMaterialsCount(); i++) {
-            multiMaterial.subMaterials.push(Materials.get(i))
-        }
-
-        return multiMaterial
-    }
-
-    private static processHiddenIndices(sphere: Mesh, scene: Scene, fromIndices: IndicesArray, processedFaces: number[] = []): {
+        fromIndices: IndicesArray,
+        processedFaces: number[] = [],
+        materialIndex: number = 1
+    ): {
         hidden: number[],
         visible: number[],
         faces: number[]
@@ -131,8 +90,8 @@ export class PlanetTransition {
         const normals = sphere.getVerticesData(VertexBuffer.NormalKind)!;
         const nonVisibleIndices: number[] = [];
         const visibleIndices: number[] = [];
-        const material1Vertices: Vector3[] = [];
-        const material1Normals: Vector3[] = [];
+        const nextMaterialVertices: Vector3[] = [];
+        const nextMaterialNormals: Vector3[] = [];
     
         for (let i = 0; i < totalFaces; i++) {
             const vertexIndex0 = indices[i * 3];
@@ -161,7 +120,7 @@ export class PlanetTransition {
             const isVisible = this.isFaceFacingCamera(scene.activeCamera! as ArcRotateCamera, positions);
             
             if (!isVisible && !processedFaces.includes(i)) {
-                this.highlightFace(scene, sphere, i);
+                this.highlightFace(scene, sphere, i, materialIndex);
                 processedFaces.push(i);
                 nonVisibleIndices.push(vertexIndex0, vertexIndex1, vertexIndex2);
 
@@ -172,97 +131,63 @@ export class PlanetTransition {
                     normals[vertexIndex0 * 3 + 2]
                 ).normalize();
                 
-                material1Vertices.push(...positions);
-                material1Normals.push(normal, normal, normal);
+                nextMaterialVertices.push(...positions);
+                nextMaterialNormals.push(normal, normal, normal);
             } else {
                 visibleIndices.push(vertexIndex0, vertexIndex1, vertexIndex2);
             }
         }
 
         // Create a single mesh instance for material 1 if we have vertices
-        if (material1Vertices.length > 0 && this.materialAssociations.length > 0) {
-            const association = this.materialAssociations.find(a => a.materialIndex === 1);
-            if (association) {
-                // Calculate average position and normal for the mesh
-                const avgPosition = material1Vertices.reduce((acc, pos) => acc.add(pos), Vector3.Zero())
-                    .scale(1 / material1Vertices.length);
-                const avgNormal = material1Normals.reduce((acc, norm) => acc.add(norm), Vector3.Zero())
-                    .normalize();
-
-                const instance = this.createMeshInstance(
-                    association.meshTemplate,
-                    avgPosition,
-                    avgNormal,
-                    scene,
-                    association.randomOffset
-                );
-                association.instances = [instance]; // Replace any existing instances
-            }
+        if (nextMaterialVertices.length > 0 && this.materialAssociations.length > 0) {
+            this.materialAssociations.forEach(association => {
+                console.log(association)
+                if (association.materialIndex === materialIndex) {
+                    this.addThinInstancesForAssociation(association, nextMaterialVertices, scene);
+                }
+            });
         }
         
         this.currentlyHiding = false;
         return { hidden: nonVisibleIndices, visible: visibleIndices, faces: processedFaces };
     }
 
-    private static processHiddenIndices2(sphere: Mesh, scene: Scene, fromIndices: IndicesArray, processedFaces: number[] = []): {
-        hidden: number[],
-        visible: number[],
-        faces: number[]
-    } {
-        this.currentlyHiding = true
-        const totalFaces = fromIndices.length / 3;
-        const indices = fromIndices;
-        const vertices = sphere.getVerticesData(VertexBuffer.PositionKind)!;
-        const nonVisibleIndices: number[] = [];
-        const visibleIndices: number[] = [];
-    
-        for (let i = 0; i < totalFaces; i++) {
-            const vertexIndex0 = indices[i * 3];     // Index of the first vertex
-            const vertexIndex1 = indices[i * 3 + 1]; // Index of the second vertex
-            const vertexIndex2 = indices[i * 3 + 2]; // Index of the third vertex
-    
-            const vertex0 = [
-                vertices[vertexIndex0 * 3],     // x-coordinate of vertex 0
-                vertices[vertexIndex0 * 3 + 1], // y-coordinate of vertex 0
-                vertices[vertexIndex0 * 3 + 2]  // z-coordinate of vertex 0
-            ];
-    
-            const vertex1 = [
-                vertices[vertexIndex1 * 3],     // x-coordinate of vertex 1
-                vertices[vertexIndex1 * 3 + 1], // y-coordinate of vertex 1
-                vertices[vertexIndex1 * 3 + 2]  // z-coordinate of vertex 1
-            ];
-    
-            const vertex2 = [
-                vertices[vertexIndex2 * 3],     // x-coordinate of vertex 2
-                vertices[vertexIndex2 * 3 + 1], // y-coordinate of vertex 2
-                vertices[vertexIndex2 * 3 + 2]  // z-coordinate of vertex 2
-            ];
-    
-            const positions = [
-                new Vector3(vertex0[0], vertex0[1], vertex0[2]), // Vertex 0
-                new Vector3(vertex1[0], vertex1[1], vertex1[2]), // Vertex 1
-                new Vector3(vertex2[0], vertex2[1], vertex2[2])  // Vertex 2
-            ];
-    
-            const isVisible = this.isFaceFacingCamera(scene.activeCamera! as ArcRotateCamera, positions);
+    private static addThinInstancesForAssociation(
+        association: MaterialMeshAssociation,
+        materialVertices: Vector3[],
+        scene: Scene
+        ): void {
+        for (let i = 1; i <= association.density; i++) {
+            console.log(i);
+            // Get a random vertex position and its normal
+            const randomIndex = Math.floor(Math.random() * materialVertices.length);
+            const randomVertexPosition = materialVertices[randomIndex];
+            const vertexNormal = randomVertexPosition.subtract(Vector3.Zero()).normalize();
+
+            // Create rotation matrix to align with surface normal
+            const rotationMatrix = Matrix.Identity();
+            const up = Vector3.Up();
+            const angle = Math.acos(Vector3.Dot(up, vertexNormal));
+            const axis = Vector3.Cross(up, vertexNormal).normalize();
             
-            if (!isVisible && !processedFaces.includes(i)) {
-                this.highlightFace(scene, sphere, i);
-                processedFaces.push(i)
-                nonVisibleIndices.push(vertexIndex0, vertexIndex1, vertexIndex2);
-            } else {
-                visibleIndices.push(vertexIndex0, vertexIndex1, vertexIndex2);
+            if (angle !== 0) {
+                Matrix.RotationAxisToRef(axis, angle, rotationMatrix);
             }
+
+            // Combine transformations: rotate -> translate -> lift
+            const surfaceOffset = association.verticalOffset; // Adjust this value to control how far above the surface
+            const liftedPosition = randomVertexPosition.add(vertexNormal.scale(surfaceOffset));
+            const transitionMatrix = rotationMatrix
+                .multiply(Matrix.Translation(liftedPosition.x, liftedPosition.y, liftedPosition.z));
+
+            association.meshTemplate.thinInstanceAdd(transitionMatrix);
         }
-        this.currentlyHiding = false
-        return { hidden: nonVisibleIndices, visible: visibleIndices, faces: processedFaces };
     }
-    
+
     public static start(materialIndex: number, scene: Scene): void {
         const sphere = scene.getMeshByName('planet') as Mesh;
 
-        this.processHiddenIndices(sphere, scene, [])
+        this.processHiddenIndices(sphere, scene, [], [], materialIndex)
 
         this.transitionRunning = true
     }
@@ -271,14 +196,12 @@ export class PlanetTransition {
         const sphere = PlanetTransition.sphere!
         const indices = sphere.getIndices()!
         const totalFaces = indices.length / 3;
-        // let processedIndices: number[] = []
         let visibleIndices = indices
         let resultOfProcessing = this.processHiddenIndices(sphere, scene, indices, this.processedFaces)
-        // processedIndices.push(...resultOfProcessing.hidden)
         this.processedFaces = resultOfProcessing.faces
 
         visibleIndices = resultOfProcessing.visible
-        // console.log("Visible indices: ", visibleIndices.length, "Total faces: ", totalFaces, "Processed faces: ", this.processedFaces.length, )
+
         // Stop the interval when the array is empty
         if (this.processedFaces.length === totalFaces) {
             console.log("Array is empty. Stopping...");
@@ -286,7 +209,7 @@ export class PlanetTransition {
         }
     }
 
-    private static highlightFace(scene: Scene, sphere: Mesh, faceIndex: number): void {
+    private static highlightFace(scene: Scene, sphere: Mesh, faceIndex: number, materialIndex: number): void {
         const indices = sphere.getIndices()!
         const vertices = sphere.getVerticesData(VertexBuffer.PositionKind)!
         
@@ -300,7 +223,7 @@ export class PlanetTransition {
         ];
 
         new SubMesh(
-            1,  // material index
+            materialIndex,  // material index
             0,  // vertex start
             sphere.getTotalVertices(),  // vertex count
             i,  // index start
