@@ -18,9 +18,6 @@ import { defineConfig } from 'vite';
 //     base: process.env.NODE_ENV === 'production' ? '/vue3-todo/' : '/',
 //   })
 
-  // vite.config.js
-export default {
-  // ...
-  base: '/planet-vlad/', // Set this to your repository name if applicable
-  // ...
-}
+export default defineConfig({
+  base: '/planet-vlad/', // Ensure this matches your repository name
+});
