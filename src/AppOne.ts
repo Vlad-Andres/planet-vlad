@@ -10,7 +10,11 @@ import {
     FollowCamera,
     Matrix,
     Quaternion,
-    SceneLoader
+    SceneLoader,
+    StandardMaterial,
+    CubeTexture,
+    Texture,
+    Color3,
 } from '@babylonjs/core'
 import { GLTFFileLoader } from "@babylonjs/loaders";
 import { Materials } from './Materials';
@@ -78,13 +82,13 @@ export class AppOne {
         // First load all tree models
         await MeshLoader.loadTreeModels(scene);
         
-        // PlanetTransition.registerMaterialMainLandmark(1, MeshLoader.getMesh("house") as Mesh, 34)
+        PlanetTransition.registerMaterialMainLandmark(1, MeshLoader.getMesh("house") as Mesh, 34)
         PlanetTransition
-            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("tree1") as Mesh, 12, 12)
+            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("tree1") as Mesh, 3, 12)
         PlanetTransition
-        //     .registerMaterialMeshAssociation(1, MeshLoader.getMesh("big-tree") as Mesh, 2, -1.6)
-        // PlanetTransition
-        //     .registerMaterialMeshAssociation(1, MeshLoader.getMesh("tree-simple") as Mesh, 1, 600)
+            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("big-tree") as Mesh, 1, -1.6)
+        PlanetTransition
+            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("tree-simple") as Mesh, 1, 600)
     }
 
     createEnvironment(): void {
@@ -101,7 +105,26 @@ export class AppOne {
         // new PlanetTransition(this.planet)
 
         this.planet.material = Materials.get(0)
-        this.planet!.material!.wireframe = true;
+        // this.planet!.material!.wireframe = true;
+
+        // Create a retro neon background
+        scene.clearColor = new Color4(0.05, 0, 0.1, 1); // Deep purple base color
+        
+        // Add neon lighting effects
+        const topLight = new HemisphericLight("topLight", new Vector3(0, 1, 0), scene);
+        topLight.intensity = 0.9;
+        topLight.diffuse = new Color3(1, 0.2, 0.8);  // Hot pink top
+        topLight.groundColor = new Color3(0.2, 0, 0.4); // Deep purple bottom
+        
+        const ambientLight = new HemisphericLight("ambientLight", new Vector3(0, -1, 0), scene);
+        ambientLight.intensity = 0.5;
+        ambientLight.diffuse = new Color3(0, 0.8, 1);  // Cyan glow
+        ambientLight.groundColor = new Color3(0.4, 0, 0.8); // Purple glow
+        
+        // Add stronger fog for neon atmosphere
+        scene.fogMode = Scene.FOGMODE_EXP2;
+        scene.fogColor = new Color3(0.15, 0, 0.3); // Purple fog
+        scene.fogDensity = 0.002; // Slightly denser fog for more atmosphere
     }
 
     setupCamera(): void {
