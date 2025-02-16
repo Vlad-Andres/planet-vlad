@@ -78,13 +78,13 @@ export class AppOne {
         // First load all tree models
         await MeshLoader.loadTreeModels(scene);
         
-        PlanetTransition.registerMaterialMainLandmark(1, MeshLoader.getMesh("house") as Mesh, 34)
+        // PlanetTransition.registerMaterialMainLandmark(1, MeshLoader.getMesh("house") as Mesh, 34)
         PlanetTransition
             .registerMaterialMeshAssociation(1, MeshLoader.getMesh("tree1") as Mesh, 12, 12)
         PlanetTransition
-            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("big-tree") as Mesh, 2, -1.6)
-        PlanetTransition
-            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("tree-simple") as Mesh, 1, 600)
+        //     .registerMaterialMeshAssociation(1, MeshLoader.getMesh("big-tree") as Mesh, 2, -1.6)
+        // PlanetTransition
+        //     .registerMaterialMeshAssociation(1, MeshLoader.getMesh("tree-simple") as Mesh, 1, 600)
     }
 
     createEnvironment(): void {
@@ -101,7 +101,7 @@ export class AppOne {
         // new PlanetTransition(this.planet)
 
         this.planet.material = Materials.get(0)
-        // this.planet!.material!.wireframe = true;
+        this.planet!.material!.wireframe = true;
     }
 
     setupCamera(): void {

@@ -6,6 +6,7 @@ import {
     Mesh,
     AssetContainer,
     VertexBuffer,
+    Quaternion
 } from '@babylonjs/core';
 import '@babylonjs/loaders';
 
@@ -27,27 +28,27 @@ export class MeshLoader {
             scale: 0.25,
             rotationY: Math.PI / 2
         },
-        {
-            name: "big-tree",
-            path: "./models/trees/",
-            file: "big-tree.glb",
-            scale: 2,
-            rotationY: Math.PI / 2
-        },
-        {
-            name: "tree-simple",
-            path: "./models/trees/",
-            file: "tree-simple.glb",
-            scale: 0.006,
-            rotationY: Math.PI / 2
-        },
-        {
-            name: "house",
-            path: "./models/buildings/",
-            file: "house.glb",
-            scale: 0.1,
-            rotationY: Math.PI / 2
-        },
+        // {
+        //     name: "big-tree",
+        //     path: "./models/trees/",
+        //     file: "big-tree.glb",
+        //     scale: 2,
+        //     rotationY: Math.PI / 2
+        // },
+        // {
+        //     name: "tree-simple",
+        //     path: "./models/trees/",
+        //     file: "tree-simple.glb",
+        //     scale: 0.006,
+        //     rotationY: Math.PI / 2
+        // },
+        // {
+        //     name: "house",
+        //     path: "./models/buildings/",
+        //     file: "house.glb",
+        //     scale: 0.1,
+        //     rotationY: Math.PI / 2
+        // },
         // {
         //     name: "winter-tree4",
         //     path: "./models/trees/",
@@ -92,6 +93,13 @@ export class MeshLoader {
                 console.error(`Error merging model ${model.file}`);
                 return;
             }
+
+            // Apply coordinate system correction
+            mergedMesh.rotationQuaternion = Quaternion.FromEulerAngles(0, 0, 0);
+            mergedMesh.computeWorldMatrix(true);
+
+            // Fix local transforms to prevent position issues
+            mergedMesh.bakeCurrentTransformIntoVertices();
     
             mergedMesh.name = model.name;
             mergedMesh.scaling.scaleInPlace(model.scale);

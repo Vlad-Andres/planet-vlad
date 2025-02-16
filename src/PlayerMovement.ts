@@ -26,7 +26,7 @@ export class PlayerMovement {
     private keysPressed: Set<string> = new Set();
     static playerUP: Vector3 = Vector3.Zero();
     private lastActionTime: number = 0;  // Track last action time
-    private readonly ACTION_DELAY: number = 1000;  // Delay in milliseconds
+    private readonly ACTION_DELAY: number = 500;  // Delay in milliseconds
     private materialIndex: number = 0;
 
 
