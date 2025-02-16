@@ -28,27 +28,27 @@ export class MeshLoader {
             scale: 0.25,
             rotationY: Math.PI / 2
         },
-        // {
-        //     name: "big-tree",
-        //     path: "./models/trees/",
-        //     file: "big-tree.glb",
-        //     scale: 2,
-        //     rotationY: Math.PI / 2
-        // },
-        // {
-        //     name: "tree-simple",
-        //     path: "./models/trees/",
-        //     file: "tree-simple.glb",
-        //     scale: 0.006,
-        //     rotationY: Math.PI / 2
-        // },
-        // {
-        //     name: "house",
-        //     path: "./models/buildings/",
-        //     file: "house.glb",
-        //     scale: 0.1,
-        //     rotationY: Math.PI / 2
-        // },
+        {
+            name: "big-tree",
+            path: "./models/trees/",
+            file: "big-tree.glb",
+            scale: 2,
+            rotationY: Math.PI / 2
+        },
+        {
+            name: "tree-simple",
+            path: "./models/trees/",
+            file: "tree-simple.glb",
+            scale: 0.006,
+            rotationY: Math.PI / 2
+        },
+        {
+            name: "house",
+            path: "./models/buildings/",
+            file: "house.glb",
+            scale: 0.1,
+            rotationY: Math.PI / 2
+        },
         // {
         //     name: "winter-tree4",
         //     path: "./models/trees/",
