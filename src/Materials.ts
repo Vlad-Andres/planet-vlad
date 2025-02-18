@@ -11,6 +11,7 @@ export class Materials {
     private static materials: (PBRMaterial|Material)[] = []
     private static multiMaterial: MultiMaterial
     private static sphereUVScale: Vector2 = Vector2.FromArray([10, 10]);
+    private static activeMaterialIndex: number = 0
     private scene: Scene
     private assets: string[] = [
         'stone',
@@ -33,6 +34,18 @@ export class Materials {
         }
         Materials.multiMaterial = multiMaterial
     }
+
+    public static getActiveMaterial(): number {
+        return Materials.activeMaterialIndex
+    }
+
+    public static getNextActiveMaterial(): number {
+        return (Materials.activeMaterialIndex + 1) % Materials.getMaterialsCount()
+    }
+
+    public static changeActiveMaterial(): void {
+        Materials.activeMaterialIndex = (Materials.activeMaterialIndex + 1) % Materials.getMaterialsCount()
+    } 
 
     getPBR(asset: string): PBRMaterial {
         const sphereUVScale = Materials.sphereUVScale

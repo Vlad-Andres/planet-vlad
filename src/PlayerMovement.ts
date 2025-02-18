@@ -90,8 +90,7 @@ export class PlayerMovement {
                 this.rotatePlayerHeading(-0.05);
             }
             if (this.keysPressed.has('n') && !PlanetTransition.transitionRunning) {
-                console.log('Material ' + this.materialIndex)
-                PlanetTransition.start(++this.materialIndex, scene)
+                PlanetTransition.start(scene)
             }
         });
     }

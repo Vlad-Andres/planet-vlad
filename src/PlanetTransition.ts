@@ -47,7 +47,6 @@ interface RandomVertexData {
  * The new material should also be associated with some additional meshes
  */
 export class PlanetTransition {
-    private static transitingToIndex: number = 0
     public static transitionRunning: boolean = false
     public static currentlyHiding: boolean = false
     public static processedFaces: number[] = []
@@ -113,7 +112,6 @@ export class PlanetTransition {
         scene: Scene,
         fromIndices: IndicesArray,
         processedFaces: number[] = [],
-        materialIndex: number = 1
     ): {
         visible: number[],
         faces: number[]
@@ -160,7 +158,7 @@ export class PlanetTransition {
                 nonVisibleVertices.push(vertex0);
                 nonVisibleIndicess.push(vertexIndex0, vertexIndex1, vertexIndex2);
                 if (!processedFaces.includes(i)) {
-                    this.changeFace(scene, sphere, i, materialIndex, positions);
+                    this.changeFace(scene, sphere, i, positions);
                     processedFaces.push(i);
                 }
             } else {
@@ -172,7 +170,7 @@ export class PlanetTransition {
         // Create a single mesh instance for material 1 if we have vertices
         if (nonVisibleVertices.length > 0 && this.materialAssociations.length > 0) {
             for (const association of this.materialAssociations) {
-                if (association.materialIndex !== materialIndex) {
+                if (association.materialIndex !== Materials.getNextActiveMaterial()) {
                     continue;
                 }
                 
@@ -282,13 +280,29 @@ export class PlanetTransition {
      */
     private static removeThinInstancesFromPreviousMaterial(visibleVertices: Vector3[]): void {
         for(const association of this.materialAssociations) {
-            if (association !== this.materialAssociations[this.transitingToIndex]) {
+            if (association.materialIndex !== Materials.getActiveMaterial()) {
                 continue
             }
-            association.meshTemplate?.dispose(true)
-            this.oldLandmark?.dispose(true)
-            this.oldLandmark = undefined
-            // const populatedVertices = this.busyPositions.keys
+            // Clear instances but preserve the template
+            if (association.meshTemplate) {
+                // Clear all thin instances
+                association.meshTemplate.thinInstanceCount = 0;
+                // Disable the template but keep it for later use
+                association.meshTemplate.setEnabled(false);
+            }
+            // Clear any stored instances
+            association.instances.forEach(instance => {
+                instance.dispose(true, true);
+            });
+            association.instances = [];
+        }
+        // Clear the busy positions map
+        this.busyPositions.clear()
+        // Handle the old landmark - disable instead of dispose
+        if (this.oldLandmark) {
+            this.oldLandmark.thinInstanceCount = 0;
+            this.oldLandmark.setEnabled(false);
+            this.oldLandmark = undefined;
         }
     }
 
@@ -327,11 +341,10 @@ export class PlanetTransition {
         }
     }
 
-    public static start(materialIndex: number, scene: Scene): void {
+    public static start(scene: Scene): void {
         const sphere = scene.getMeshByName('planet') as Mesh;
         this.removeThinInstancesFromPreviousMaterial([])
-        this.transitingToIndex = materialIndex
-        this.processHiddenIndices(sphere, scene, [], [], materialIndex)
+        this.processHiddenIndices(sphere, scene, [], [])
 
         this.transitionRunning = true
     }
@@ -341,7 +354,7 @@ export class PlanetTransition {
         const indices = sphere.getIndices()!
         const totalFaces = indices.length / 3;
         // let visibleIndices = indices
-        let resultOfProcessing = this.processHiddenIndices(sphere, scene, indices, this.processedFaces, this.transitingToIndex)
+        let resultOfProcessing = this.processHiddenIndices(sphere, scene, indices, this.processedFaces)
         this.processedFaces = resultOfProcessing.faces
 
         // visibleIndices = resultOfProcessing.visible
@@ -349,13 +362,13 @@ export class PlanetTransition {
         // Stop the interval when the array is empty
         if (this.processedFaces.length === totalFaces) {
             console.log("Array is empty. Stopping...");
+            Materials.changeActiveMaterial()
             this.facesProcessedBefore = this.processedFaces
-            this.processedFaces = []
-            this.transitionRunning = false
+            this.resetVariables()
         }
     }
 
-    private static changeFace(scene: Scene, sphere: Mesh, faceIndex: number, materialIndex: number, positions: Vector3[]): void {
+    private static changeFace(scene: Scene, sphere: Mesh, faceIndex: number, positions: Vector3[]): void {
         const indices = sphere.getIndices()!
         const vertices = sphere.getVerticesData(VertexBuffer.PositionKind)!
         
@@ -364,7 +377,7 @@ export class PlanetTransition {
         const i = faceIndex * 3;
 
         new SubMesh(
-            materialIndex,  // material index
+            Materials.getNextActiveMaterial(),  // material index
             0,  // vertex start
             sphere.getTotalVertices(),  // vertex count
             i,  // index start
@@ -406,5 +419,24 @@ export class PlanetTransition {
     
         // Face is considered visible if any of its vertices are visible
         return visibleVertices > 0;
+    }
+
+    private static resetVariables(): void {
+        this.transitionRunning = false
+        this.processedFaces = []
+        this.facesProcessedBefore = []
+        
+        // Clean up submeshes when transition is complete
+        if (this.sphere) { 
+            // TODO: FIND OUT WHY THIS DOES NOT WORK
+            // // First dispose all submeshes
+            // while (this.sphere.subMeshes.length > 0) {
+            //     this.sphere.subMeshes[0].dispose();
+            // }
+
+            // // Then set the sphere's material to the current active material
+            // const material = Materials.get(Materials.getActiveMaterial());
+            // this.sphere.material = material;
+        }
     }
 }
