@@ -35,8 +35,12 @@ export class Materials {
         Materials.multiMaterial = multiMaterial
     }
 
-    public static getActiveMaterial(): number {
+    public static getActiveMaterialIndex(): number {
         return Materials.activeMaterialIndex
+    }
+
+    public static getActiveMaterial(): Material {
+        return Materials.get(Materials.activeMaterialIndex) as Material
     }
 
     public static getNextActiveMaterial(): number {
@@ -44,8 +48,43 @@ export class Materials {
     }
 
     public static changeActiveMaterial(): void {
-        Materials.activeMaterialIndex = (Materials.activeMaterialIndex + 1) % Materials.getMaterialsCount()
-    } 
+        // Get the current material before changing index
+        const oldMaterial = this.materials[this.activeMaterialIndex];
+        
+        // Update the index
+        this.activeMaterialIndex = (this.activeMaterialIndex + 1) % this.getMaterialsCount();
+        
+        // Get the new material
+        const newMaterial = this.materials[this.activeMaterialIndex];
+        
+        // // Update the multimaterial
+        // if (this.multiMaterial) {
+        //     this.multiMaterial.subMaterials = this.multiMaterial.subMaterials.map(mat => 
+        //         mat === oldMaterial ? newMaterial : mat
+        //     );
+        // }
+    }
+    
+
+    public static dispose(): void {
+        this.materials.forEach(material => {
+            if (material instanceof StandardMaterial) {
+                material.diffuseTexture?.dispose();
+                material.bumpTexture?.dispose();
+                material.specularTexture?.dispose();
+                material.ambientTexture?.dispose();
+            } else if (material instanceof PBRMaterial) {
+                material.albedoTexture?.dispose();
+                material.bumpTexture?.dispose();
+                material.metallicTexture?.dispose();
+                material.ambientTexture?.dispose();
+            }
+            material.dispose();
+        });
+        
+        this.materials = [];
+        this.multiMaterial.dispose();
+    }
 
     getPBR(asset: string): PBRMaterial {
         const sphereUVScale = Materials.sphereUVScale
@@ -135,4 +174,15 @@ export class Materials {
     public static getMultiMaterial(): MultiMaterial {
         return Materials.multiMaterial
     }
+
+    // public static getMultiMaterial(scene: Scene): MultiMaterial {
+    //     if (!this.multiMaterial) {
+    //         this.multiMaterial = new MultiMaterial("planetMultiMaterial", scene);
+    //         // Initialize with all materials
+    //         for (let i = 0; i < this.materials.length; i++) {
+    //             this.multiMaterial.subMaterials.push(this.materials[i]);
+    //         }
+    //     }
+    //     return this.multiMaterial;
+    // }
 }
