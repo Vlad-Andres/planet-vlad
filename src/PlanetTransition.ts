@@ -183,9 +183,14 @@ export class PlanetTransition {
                 vertex.liftedPosition.y,
                 vertex.liftedPosition.z
             ));
-        this.busyPositions.set(vertex.liftedPosition, association.meshTemplate!.thinInstanceAdd(transitionMatrix));
-        this.oldLandmark = association.meshTemplate ?? undefined
-        association.meshTemplate = null
+
+        const meshTemplate = association.meshTemplate;
+        if (meshTemplate) {
+            meshTemplate.setEnabled(true);
+            this.busyPositions.set(vertex.liftedPosition, meshTemplate.thinInstanceAdd(transitionMatrix));
+            this.oldLandmark = meshTemplate;
+            association.meshTemplate = null;
+        }
     }
 
     private static getRandomIndex(
@@ -274,10 +279,18 @@ export class PlanetTransition {
 
     public static start(scene: Scene): void {
         const sphere = scene.getMeshByName('planet') as Mesh;
-        this.removeThinInstancesFromPreviousMaterial([])
-        this.processHiddenIndices(sphere, scene, [], [])
-
-        this.transitionRunning = true
+        
+        // Reset all mesh templates to their initial state
+        this.materialAssociations.forEach(association => {
+            if (association.meshTemplate) {
+                association.meshTemplate.thinInstanceCount = 0;
+                association.meshTemplate.setEnabled(true);
+            }
+        });
+        
+        this.removeThinInstancesFromPreviousMaterial([]);
+        this.processHiddenIndices(sphere, scene, [], []);
+        this.transitionRunning = true;
     }
 
     public static transitHiddenFaces(scene: Scene): void {
@@ -353,16 +366,13 @@ export class PlanetTransition {
         this.facesProcessedBefore = [];
         
         if (this.sphere) {
-            // Store the current material index
             const nextMaterialIndex = Materials.getNextActiveMaterial();
             
-            // Clear all submeshes
             this.sphere.subMeshes.forEach(submesh => {
                 submesh.dispose();
             });
             this.sphere.subMeshes = [];
             
-            // Create a new submesh for the entire sphere with the next material
             new SubMesh(
                 nextMaterialIndex,
                 0,
@@ -372,7 +382,6 @@ export class PlanetTransition {
                 this.sphere
             );
             
-            // Set the material to ensure it's visible
             this.sphere.material = Materials.getMultiMaterial();
         }
         
