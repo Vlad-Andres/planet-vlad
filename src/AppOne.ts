@@ -22,6 +22,7 @@ import { PlanetTransition } from './PlanetTransition';
 import { PlayerMovement } from './PlayerMovement';
 import { MeshLoader } from './MeshLoader';
 import { Inspector } from '@babylonjs/inspector';
+import { BiomeManager } from './BiomeManager';
 
 // import * as BABYLON from '@babylonjs/core'; 
 
@@ -45,9 +46,14 @@ export class AppOne {
         this.playerMovement = new PlayerMovement(this.planet, this.scene)
         this.setupCamera()
         new PlanetTransition(this.planet, false)
+        this.loadMeshes(this.scene, this.planet).then(() => {
+            PlanetTransition.imediatelySpawnAll(this.scene)
+        }); 
+
+        // Initialize BiomeManager
+        BiomeManager.initialize(this.scene)
 
         // registerBuiltInLoaders();
-        this.loadMeshes(this.scene, this.planet)
     }
 
     debug(debugOn: boolean = true) {
@@ -82,13 +88,13 @@ export class AppOne {
         // First load all tree models
         await MeshLoader.loadTreeModels(scene);
         
-        PlanetTransition.registerMaterialMainLandmark(1, MeshLoader.getMesh("house") as Mesh, 34)
+        PlanetTransition.registerMaterialMainLandmark(0, MeshLoader.getMesh("house") as Mesh, 34)
         PlanetTransition
-            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("tree1") as Mesh, 3, 12)
+            .registerMaterialMeshAssociation(0, MeshLoader.getMesh("tree1") as Mesh, 3, 12)
         PlanetTransition
-            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("big-tree") as Mesh, 1, -1.6)
+            .registerMaterialMeshAssociation(0, MeshLoader.getMesh("big-tree") as Mesh, 1, -1.6)
         PlanetTransition
-            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("tree-simple") as Mesh, 1, 600)
+            .registerMaterialMeshAssociation(0, MeshLoader.getMesh("tree-simple") as Mesh, 1, 600)
     }
 
     createEnvironment(): void {
@@ -97,14 +103,14 @@ export class AppOne {
         this.planet = MeshBuilder.CreateSphere('planet', { diameter: 8, segments: 32, updatable:true }, scene)
         this.planet.position = Vector3.Zero()
 
-        const asset = 'brick'
-        this.planet.applyDisplacementMap('displacement-models/'+ asset +'/height.png', 0, 1, undefined, undefined, Materials.getScale());
+        // const asset = 'grass'
+        // this.planet.applyDisplacementMap('displacement-models/'+ asset +'/height.png', 0, 1, undefined, undefined, Materials.getScale());
         // var material = new StandardMaterial("kosh", scene);
 
         new Materials(this.scene)
-        // new PlanetTransition(this.planet)
 
-        this.planet.material = Materials.get(0)
+
+        // this.planet.material = Materials.get(0)
         // this.planet!.material!.wireframe = true;
 
         // Create a retro neon background

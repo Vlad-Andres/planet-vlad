@@ -14,15 +14,47 @@ export class Materials {
     private static activeMaterialIndex: number = 0
     private scene: Scene
     private assets: string[] = [
-        'stone',
         'grass',
+        'asphalt',
         'brick',
+        'volcanic',
     ]
+
+    private materialConfigs: { [key: string]: { roughness: number, useAmbientOcclusionFromMetallicTextureRed: boolean, invertNormalMapX: boolean, invertNormalMapY: boolean, scale: number } } = {
+        'grass': {
+            roughness: 0.65,
+            useAmbientOcclusionFromMetallicTextureRed: true,
+            invertNormalMapX: true,
+            invertNormalMapY: true,
+            scale: 1.0
+        },
+        'asphalt': {
+            roughness: 0.8,
+            useAmbientOcclusionFromMetallicTextureRed: true,
+            invertNormalMapX: true,
+            invertNormalMapY: true,
+            scale: 3.0
+        },
+        'brick': {
+            roughness: 0.3, // Lower roughness for brick material
+            useAmbientOcclusionFromMetallicTextureRed: true,
+            invertNormalMapX: true,
+            invertNormalMapY: true,
+            scale: 10.0
+        },
+        'volcanic': {
+            roughness: 0.9,
+            useAmbientOcclusionFromMetallicTextureRed: true,
+            invertNormalMapX: true,
+            invertNormalMapY: true,
+            scale: 5.0
+        }
+    }
 
     constructor(scene: Scene) {
         this.scene = scene
         this.assets.forEach(asset => {
-            Materials.materials.push(this.getMaterial(asset))
+            Materials.materials.push(this.getPBR(asset))
         });
         this.setMultiMaterial()
     }
@@ -47,22 +79,15 @@ export class Materials {
         return (Materials.activeMaterialIndex + 1) % Materials.getMaterialsCount()
     }
 
-    public static changeActiveMaterial(): void {
+    public static changeActiveMaterial(index?: number): void {
         // Get the current material before changing index
         const oldMaterial = this.materials[this.activeMaterialIndex];
-        
+
         // Update the index
-        this.activeMaterialIndex = (this.activeMaterialIndex + 1) % this.getMaterialsCount();
-        
+        this.activeMaterialIndex = index !== undefined ? index : (this.activeMaterialIndex + 1) % this.getMaterialsCount();
+
         // Get the new material
         const newMaterial = this.materials[this.activeMaterialIndex];
-        
-        // // Update the multimaterial
-        // if (this.multiMaterial) {
-        //     this.multiMaterial.subMaterials = this.multiMaterial.subMaterials.map(mat => 
-        //         mat === oldMaterial ? newMaterial : mat
-        //     );
-        // }
     }
     
 
@@ -103,24 +128,22 @@ export class Materials {
         const metallic = new Texture('displacement-models/'+ asset +'/metallic.png', this.scene)
         texturesArray.push(metallic)
 
-        texturesArray.forEach(texture => {
-            texture.uScale = sphereUVScale.x
-            texture.vScale = sphereUVScale.y
-        });
-
-        // displacement.uScale = displacement.vScale = 3
         material.albedoTexture = albedo
         material.bumpTexture = normal
         material.ambientTexture = ambientOcclusion
         material.metallicTexture = metallic
 
-        // material.microSurface = 0.1
-        material.useAmbientOcclusionFromMetallicTextureRed = true
-        material.invertNormalMapX = true
-        material.invertNormalMapY = true
-        material.roughness = 0.65
-        // material.wireframe = true
+        // Apply material configuration based on asset type
+        const config = this.materialConfigs[asset]
+        material.roughness = config.roughness
+        material.useAmbientOcclusionFromMetallicTextureRed = config.useAmbientOcclusionFromMetallicTextureRed
+        material.invertNormalMapX = config.invertNormalMapX
+        material.invertNormalMapY = config.invertNormalMapY
 
+        texturesArray.forEach(texture => {
+            texture.uScale = config.scale
+            texture.vScale = config.scale
+        });
 
         return material
     }

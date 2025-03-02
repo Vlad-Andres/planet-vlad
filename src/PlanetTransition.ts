@@ -82,8 +82,8 @@ export class PlanetTransition {
         sphere: Mesh,
         scene: Scene,
         fromIndices: IndicesArray,
-        processedFaces: number[] = [],
-    ): {
+        processedFaces: number[] = []
+        ): {
         visible: number[],
         faces: number[]
     } {
@@ -96,7 +96,7 @@ export class PlanetTransition {
         const visibleFaces: number[] = []
 
         let nonVisibleVertices: Vector3[] = [];
-    
+        const nextMaterial = Materials.getNextActiveMaterial()
         for (let i = 0; i < totalFaces; i++) {
             const vertexIndex0 = indices[i * 3];
             const vertexIndex1 = indices[i * 3 + 1];
@@ -122,12 +122,11 @@ export class PlanetTransition {
     
             const positions = [vertex0, vertex1, vertex2];
             const isVisible = this.isFaceFacingCamera(scene.activeCamera! as ArcRotateCamera, positions);
-            
             if (!isVisible) {
                 nonVisibleVertices.push(vertex0);
                 nonVisibleIndicess.push(vertexIndex0, vertexIndex1, vertexIndex2);
                 if (!processedFaces.includes(i)) {
-                    this.changeFace(scene, sphere, i, positions);
+                    this.changeFace(scene, sphere, i, positions, nextMaterial);
                     processedFaces.push(i);
                 }
             } else {
@@ -138,7 +137,7 @@ export class PlanetTransition {
 
         if (nonVisibleVertices.length > 0 && this.materialAssociations.length > 0) {
             for (const association of this.materialAssociations) {
-                if (association.materialIndex !== Materials.getNextActiveMaterial()) {
+                if (association.materialIndex !== nextMaterial) {
                     continue;
                 }
                 
@@ -258,7 +257,6 @@ export class PlanetTransition {
     ): void {
         for (let i = 1; i <= association.density; i++) {
             const vertexData = this.getRandomIndex(materialVertices, association.verticalOffset)
-            
             if (vertexData.isTooClose) {
                 continue;
             }
@@ -274,6 +272,15 @@ export class PlanetTransition {
                 ));
 
             this.busyPositions.set(vertexData.vertex, association.meshTemplate!.thinInstanceAdd(transitionMatrix));
+        }
+    }
+
+    private static addAllThinInstancesForAssociation(
+        association: MaterialMeshAssociation,
+        vertices: Vector3[],
+    ): void {
+        for (let i = 0; i < 10; i++) {
+            this.addThinInstancesForAssociation(association, vertices);
         }
     }
 
@@ -293,6 +300,45 @@ export class PlanetTransition {
         this.transitionRunning = true;
     }
 
+    public static imediatelySpawnAll(scene: Scene) {
+        console.log('initial transtition')
+        const sphere = scene.getMeshByName('planet') as Mesh;
+
+        // Set material index to 0 (grass biome) before spawning
+        // This ensures we start with the grass biome (index 0 in BiomeManager)
+        Materials.changeActiveMaterial(0);
+        
+        // Reset all mesh templates to their initial state
+        this.materialAssociations.forEach(association => {
+            if (association.meshTemplate) {
+                association.meshTemplate.thinInstanceCount = 0;
+                association.meshTemplate.setEnabled(true);
+            }
+        });
+
+        const vertices = this.sphere.getVerticesData(VertexBuffer.PositionKind)!;
+        const materialVertices: Vector3[] = [];
+        for (let i = 0; i < vertices.length; i += 3) {
+            const vertex = new Vector3(vertices[i], vertices[i + 1], vertices[i + 2]);
+            materialVertices.push(vertex);
+        }
+
+        for (const association of this.materialAssociations) {
+            if (association.materialIndex !== 0) {
+                continue;
+            }
+            
+            if (association.density !== 0) {
+                this.addAllThinInstancesForAssociation(association, materialVertices);
+            }
+        }
+
+        this.transitionRunning = true;
+        this.facesProcessedBefore = this.processedFaces;
+        this.transitionRunning = false;
+        // this.resetVariables();
+    }
+
     public static transitHiddenFaces(scene: Scene): void {
         const sphere = this.sphere;
         const indices = sphere.getIndices()!;
@@ -300,7 +346,6 @@ export class PlanetTransition {
         
         let resultOfProcessing = this.processHiddenIndices(sphere, scene, indices, this.processedFaces);
         this.processedFaces = resultOfProcessing.faces;
-    
         if (this.processedFaces.length === totalFaces) {
             console.log("Transition complete");
             this.facesProcessedBefore = this.processedFaces;
@@ -309,15 +354,20 @@ export class PlanetTransition {
         }
     }
 
-    private static changeFace(scene: Scene, sphere: Mesh, faceIndex: number, positions: Vector3[]): void {
+    private static changeFace(
+        scene: Scene,
+        sphere: Mesh,
+        faceIndex: number,
+        positions: Vector3[],
+        materialIndex: number
+    ): void {
         const indices = sphere.getIndices()!;
         const vertices = sphere.getVerticesData(VertexBuffer.PositionKind)!;
         
         if (!indices || !vertices) return;
         
         const i = faceIndex * 3;
-        const nextMaterialIndex = Materials.getNextActiveMaterial();
-        console.log(nextMaterialIndex)
+        const nextMaterialIndex = materialIndex
         
         // Create new submesh with the next material
         new SubMesh(
@@ -360,13 +410,13 @@ export class PlanetTransition {
         return visibleVertices > 0;
     }
 
-    private static resetVariables(): void {
+    private static resetVariables(materialIndex? :number): void {
         this.transitionRunning = false;
         this.processedFaces = [];
         this.facesProcessedBefore = [];
         
         if (this.sphere) {
-            const nextMaterialIndex = Materials.getNextActiveMaterial();
+            const nextMaterialIndex =  Materials.getNextActiveMaterial();
             
             this.sphere.subMeshes.forEach(submesh => {
                 submesh.dispose();
