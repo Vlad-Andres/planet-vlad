@@ -28,7 +28,16 @@ export class PlayerMovement {
     static playerUP: Vector3 = Vector3.Zero();
     private lastActionTime: number = 0;  // Track last action time
     private readonly ACTION_DELAY: number = 500;  // Delay in milliseconds
-    private materialIndex: number = 0;
+    private currentBiomIndex: number = 0;
+    private readonly LANDMARK_PROXIMITY_THRESHOLD = 4; // Distance threshold for landmark interaction
+    // Biome-specific landmark proximity thresholds
+    private readonly BIOME_THRESHOLDS = [
+        34, // First biome (Childhood in Moldova) threshold
+        20, // Second biome (Moving to the Big City) threshold
+        1, // Third biome (The Netherlands) threshold
+        2,3  // Fourth biome (Iceland) threshold
+    ];
+    private readonly VERTICAL_OFFSET_FACTOR = 0.15; // Factor to adjust threshold based on vertical offset
 
 
     constructor(planet: Mesh, scene: Scene) {
@@ -66,6 +75,38 @@ export class PlayerMovement {
     }
 
     // Assume playerHeading is already defined and normalized.
+    private checkLandmarkProximity(): void {
+        if (PlanetTransition.transitionRunning) return;
+
+        const landmark = PlanetTransition.getCurrentLandmark();
+        if (!landmark) return;
+
+        // Get the thin instance's world matrix
+        const thinInstanceWorldMatrices = landmark.thinInstanceGetWorldMatrices();
+        if (thinInstanceWorldMatrices.length === 0) return;
+
+        // Get the position from the world matrix of the first (and only) instance
+        const instancePosition = new Vector3(
+            thinInstanceWorldMatrices[0].m[12],
+            thinInstanceWorldMatrices[0].m[13],
+            thinInstanceWorldMatrices[0].m[14]
+        );
+
+        // Get current biome index
+        const currentBiomeIndex = BiomeManager.getCurrentBiomeIndex();
+        console.log(currentBiomeIndex)
+        // Get the base threshold for the current biome
+        const baseThreshold = this.BIOME_THRESHOLDS[this.currentBiomIndex] || 15;
+        
+        const distance = Vector3.Distance(this.player.position, instancePosition);
+        console.log(`Distance to landmark: ${distance}, Threshold: ${baseThreshold}`);
+        
+        if (distance < baseThreshold) {
+            BiomeManager.startBiomeTransition(this.player.getScene());
+            this.currentBiomIndex++;
+        }
+    }
+
     private setupControls(scene: Scene): void {
         scene.onKeyboardObservable.add((kbInfo) => {
             this.runTransitionIfApplicable(scene)
@@ -110,6 +151,9 @@ export class PlayerMovement {
         
         this.player.position = this.planet.position.add(newPosition);
         this.playerHeading = Vector3.TransformCoordinates(this.playerHeading, rotationMatrix).normalize();
+
+        // Check for landmark proximity after movement
+        this.checkLandmarkProximity();
     }
 
     private rotatePlayerHeading(angle: number): void {

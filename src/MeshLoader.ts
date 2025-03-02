@@ -35,12 +35,19 @@ export class MeshLoader {
                 file: "big-tree.glb",
                 scale: 2,
                 rotationY: Math.PI / 2,
-                flipFaces: false
+                flipFaces: true
             },
             treeSimple: {
                 path: "./models/trees/",
                 file: "tree-simple.glb",
                 scale: 0.006,
+                rotationY: Math.PI / 2,
+                flipFaces: true
+            },
+            brad: {
+                path: "./models/trees/",
+                file: "Snowy Trees.glb",
+                scale: 2,
                 rotationY: Math.PI / 2,
                 flipFaces: false
             }
@@ -88,6 +95,48 @@ export class MeshLoader {
                 rotationY: Math.PI / 2,
                 flipFaces: false
             },
+            townHouse: {
+                path: "./models/buildings/",
+                file: "Town House.glb",
+                scale: 0.3,
+                rotationY: Math.PI / 2,
+                flipFaces: false
+            },
+            chimney: {
+                path: "./models/buildings/",
+                file: "Chimney.glb",
+                scale: 0.004,
+                rotationY: Math.PI / 2,
+                flipFaces: true
+            },
+            buildingRed: {
+                path: "./models/buildings/",
+                file: "Building Red.glb",
+                scale: 0.6,
+                rotationY: Math.PI / 2,
+                flipFaces: false
+            },
+            books: {
+                path: "./models/buildings/",
+                file: "Book Stack.glb",
+                scale: 1,
+                rotationY: Math.PI / 2,
+                flipFaces: false
+            },
+            mount: {
+                path: "./models/buildings/",
+                file: "Mount Fuji.glb",
+                scale: 0.4,
+                rotationY: Math.PI / 2,
+                flipFaces: false
+            },
+            volcano: {
+                path: "./models/buildings/",
+                file: "Volcano.glb",
+                scale: 2,
+                rotationY: Math.PI / 2,
+                flipFaces: true
+            },
         },
         environment: {
             grass: {
@@ -96,6 +145,13 @@ export class MeshLoader {
                 scale: 0.015,
                 rotationY: Math.PI / 2,
                 flipFaces: false
+            },
+            seagull: {
+                path: "./models/small/",
+                file: "Seagull.glb",
+                scale: 0.02,
+                rotationY: Math.random() * Math.PI / 2,
+                flipFaces: true
             }
         }
     };
@@ -186,6 +242,8 @@ export class MeshLoader {
             mergedMesh.scaling.scaleInPlace(model.scale);
             if (model.rotationY !== undefined) {
                 mergedMesh.rotation.y = model.rotationY;
+                mergedMesh.rotation.x = model.rotationY;
+
             }
             if (model.flipFaces) {
                 mergedMesh.flipFaces(true);

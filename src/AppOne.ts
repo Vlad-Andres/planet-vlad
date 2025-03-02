@@ -107,7 +107,23 @@ export class AppOne {
             .registerMaterialMeshAssociation(1, MeshLoader.getMesh("skyscraper") as Mesh, 1, 6)
         PlanetTransition
             .registerMaterialMeshAssociation(1, MeshLoader.getMesh("statue") as Mesh, 10, 1.2)
-    }
+
+        PlanetTransition.registerMaterialMainLandmark(2, MeshLoader.getMesh("books") as Mesh, 0.8)
+        PlanetTransition
+            .registerMaterialMeshAssociation(2, MeshLoader.getMesh("townHouse") as Mesh, 3, 9)
+        PlanetTransition
+            .registerMaterialMeshAssociation(2, MeshLoader.getMesh("chimney") as Mesh, 1, 1450)
+        PlanetTransition
+            .registerMaterialMeshAssociation(2, MeshLoader.getMesh("buildingRed") as Mesh, 2, 2.5)
+
+        PlanetTransition.registerMaterialMainLandmark(3, MeshLoader.getMesh("volcano") as Mesh, -1.9)
+        PlanetTransition
+            .registerMaterialMeshAssociation(3, MeshLoader.getMesh("mount") as Mesh, 1, 6.6)
+        PlanetTransition
+            .registerMaterialMeshAssociation(3, MeshLoader.getMesh("brad") as Mesh, 150, -1)
+        PlanetTransition
+            .registerMaterialMeshAssociation(3, MeshLoader.getMesh("seagull") as Mesh, 1, 220)
+        }
 
     createEnvironment(): void {
         const scene = this.scene
