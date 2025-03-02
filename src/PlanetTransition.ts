@@ -45,6 +45,11 @@ export class PlanetTransition {
     private static busyPositions: Map<Vector3, number> = new Map(); // position to indice number localted there
     private static INSTANCE_FREE_RADIUS = 5
     private static oldLandmark: Mesh | undefined = undefined
+    private static currentLandmark: Mesh | undefined = undefined
+
+    public static getCurrentLandmark(): Mesh | undefined {
+        return this.currentLandmark;
+    }
 
     constructor(sphere: Mesh, debug: boolean) {
         const multiMaterial = Materials.getMultiMaterial();
@@ -146,6 +151,18 @@ export class PlanetTransition {
         }
 
         if (nonVisibleVertices.length > 0 && this.materialAssociations.length > 0) {
+            // First pass: Add landmarks only
+            for (const association of this.materialAssociations) {
+                if (association.materialIndex !== nextMaterial) {
+                    continue;
+                }
+                
+                if (association.density === 0 && association.meshTemplate != null) {
+                    this.addMainLandmark(association, nonVisibleVertices);
+                }
+            }
+
+            // Second pass: Add other meshes
             for (const association of this.materialAssociations) {
                 if (association.materialIndex !== nextMaterial) {
                     continue;
@@ -153,8 +170,6 @@ export class PlanetTransition {
                 
                 if (association.density !== 0) {
                     this.addThinInstancesForAssociation(association, nonVisibleVertices);
-                } else if (association.meshTemplate != null) {
-                    this.addMainLandmark(association, nonVisibleVertices);
                 }
             }
         }
@@ -181,23 +196,35 @@ export class PlanetTransition {
         const MAX_ATTEMPTS = 50;
         let attempts = 0;
         let vertex;
-
+        
+        // Get player position from the scene
+        const scene = this.sphere.getScene();
+        const player = scene.getMeshByName('player') as Mesh;
+        const playerPosition = player ? player.position : null;
+        const MIN_PLAYER_DISTANCE = 10; // Minimum distance from player
+        
         // Keep trying to find a valid position until we succeed or run out of attempts
         do {
             vertex = this.getRandomIndex(materialVertices, association.verticalOffset, 16);
             attempts++;
-
+            
             // If we've tried too many times, adjust the spacing requirements
             if (attempts > MAX_ATTEMPTS / 2) {
                 vertex = this.getRandomIndex(materialVertices, association.verticalOffset, 8); // Try with smaller spacing
             }
-        } while (vertex.isTooClose && attempts < MAX_ATTEMPTS);
-
+        } while (
+            (
+                vertex.isTooClose ||
+                (playerPosition && Vector3.Distance(vertex.liftedPosition, playerPosition) < MIN_PLAYER_DISTANCE)
+            ) &&
+                attempts < MAX_ATTEMPTS
+        );
+        
         // If we still couldn't find a position, force placement at the last attempted position
         if (vertex.isTooClose) {
             console.warn('Could not find optimal landmark position, forcing placement');
         }
-
+        
         const scale = 1;
         const scaleMatrix = Matrix.Scaling(scale, scale, scale);
         const transitionMatrix = scaleMatrix
@@ -207,12 +234,13 @@ export class PlanetTransition {
                 vertex.liftedPosition.y,
                 vertex.liftedPosition.z
             ));
-
+    
         const meshTemplate = association.meshTemplate;
         if (meshTemplate) {
             meshTemplate.setEnabled(true);
             this.busyPositions.set(vertex.liftedPosition, meshTemplate.thinInstanceAdd(transitionMatrix));
             this.oldLandmark = meshTemplate;
+            this.currentLandmark = meshTemplate;
             association.meshTemplate = null;
         }
     }
@@ -352,6 +380,18 @@ export class PlanetTransition {
             materialVertices.push(vertex);
         }
 
+        // First pass: Add landmarks only
+        for (const association of this.materialAssociations) {
+            if (association.materialIndex !== 0) {
+                continue;
+            }
+            console.log('here')
+            if (association.density === 0 && association.meshTemplate != null) {
+                this.addMainLandmark(association, materialVertices);
+            }
+        }
+
+        // Second pass: Add other meshes
         for (const association of this.materialAssociations) {
             if (association.materialIndex !== 0) {
                 continue;
