@@ -55,7 +55,56 @@ export class BiomeManager {
         
         this.scene = scene;
         this.setupBiomes();
-        this.setupHorizonEffect(scene);
+        
+        // Make sure we have a valid camera before setting up the horizon effect
+        if (scene.activeCamera) {
+            this.setupHorizonEffect(scene);
+            
+            // Ensure the effect is attached to the camera and enabled
+            if (this.horizonBlurEffect) {
+                this.horizonBlurEffect.onSizeChangedObservable.add(() => {
+                    if (this.horizonBlurEffect) {
+                        const effect = this.horizonBlurEffect.getEffect();
+                        if (effect) {
+                            effect.setFloat2("screenSize", 
+                                scene.getEngine().getRenderWidth(), 
+                                scene.getEngine().getRenderHeight());
+                        }
+                    }
+                });
+            }
+            
+            // Add a render observer to update effect parameters each frame with improved error handling
+            scene.onBeforeRenderObservable.add(() => {
+                if (this.horizonBlurEffect) {
+                    const planet = scene.getMeshByName("planet");
+                    if (planet && scene.activeCamera) {
+                        try {
+                            const worldMatrix = planet.getWorldMatrix();
+                            const viewProjection = scene.getTransformMatrix();
+                            const worldViewProjection = worldMatrix.multiply(viewProjection);
+                            
+                            // Get the effect from the post process
+                            const effect = this.horizonBlurEffect?.getEffect();
+                            if (effect) {
+                                effect.setMatrix("worldViewProjection", worldViewProjection);
+                                effect.setVector3("planetCenter", planet.position);
+                                
+                                // Update radius parameter for dynamic effect
+                                const distanceToCamera = Vector3.Distance(planet.position, scene.activeCamera.position);
+                                const dynamicRadius = Math.max(1.0, Math.min(3.0, distanceToCamera / 10));
+                                effect.setFloat("radius", dynamicRadius);
+                            }
+                        } catch (error) {
+                            console.warn("Error updating horizon blur effect:", error);
+                        }
+                    }
+                }
+            });
+
+        } else {
+            console.warn("No active camera found. Horizon effect will not be applied.");
+        }
         
         // Apply the initial biome (grass) environment immediately
         this.applyBiomeEnvironment(0);
@@ -175,20 +224,35 @@ export class BiomeManager {
             uniform mat4 worldViewProjection;
             
             void main(void) {
-                vec4 color = texture2D(textureSampler, vUV);
+                vec4 baseColor = texture2D(textureSampler, vUV);
                 
-                // Calculate distance from center (planet) as viewed from screen
-                vec2 center = vec2(0.5, 0.5); // Assume planet center is middle of screen
-                float dist = distance(vUV, center);
+                // Calculate normalized screen coordinates
+                vec2 normalizedCoords = (vUV - 0.5) * 2.0;
+                float distFromCenter = length(normalizedCoords);
                 
-                // Apply blur based on distance from center (stronger at the horizon)
-                float horizon = planetRadius * 0.9; // Adjust for where horizon appears
-                float strength = smoothstep(horizon - 0.1, horizon + 0.1, dist);
+                // Define horizon parameters - adjusted for better visual effect
+                float horizonStart = 0.5;  // Where the horizon effect begins (reduced to start earlier)
+                float horizonEnd = 0.85;    // Where the horizon effect is strongest
                 
-                // Apply blur intensity near horizon
-                float blurAmount = strength * radius;
+                // Calculate blur strength based on distance from horizon
+                float horizonStrength = smoothstep(horizonStart, horizonEnd, distFromCenter);
                 
-                gl_FragColor = color * (1.0 - blurAmount * 0.5) + vec4(0.0, 0.0, 0.0, 0.0) * blurAmount;
+                // Apply radial blur with more samples for smoother effect
+                vec4 blurredColor = vec4(0.0);
+                float totalWeight = 0.0;
+                int samples = 24; // Increased sample count for smoother blur
+                
+                for(int i = 0; i < samples; i++) {
+                    float angle = float(i) * (3.14159 * 2.0 / float(samples));
+                    vec2 offset = vec2(cos(angle), sin(angle)) * radius * horizonStrength * 0.07; // Increased blur intensity
+                    blurredColor += texture2D(textureSampler, vUV + offset);
+                    totalWeight += 1.0;
+                }
+                
+                blurredColor /= totalWeight;
+                
+                // Blend between original and blurred color based on horizon strength
+                gl_FragColor = mix(baseColor, blurredColor, horizonStrength * 0.9); // Increased blend factor
             }
         `;
         
@@ -203,10 +267,19 @@ export class BiomeManager {
         );
         
         this.horizonBlurEffect.onApply = (effect) => {
-            effect.setFloat("radius", 0.25); // Blur intensity
+            effect.setFloat("radius", 1.0);  // Increased blur radius
             effect.setFloat2("screenSize", scene.getEngine().getRenderWidth(), scene.getEngine().getRenderHeight());
-            effect.setFloat("planetRadius", 4.0); // Adjust based on your planet radius
-            // Set planet center in screen space would require additional calculations in a real implementation
+            effect.setFloat("planetRadius", 8.0);  // Matches the planet's actual diameter
+            
+            // Get planet's world position and transform to screen space
+            const planet = scene.getMeshByName("planet");
+            if (planet) {
+                const worldMatrix = planet.getWorldMatrix();
+                const viewProjection = scene.getTransformMatrix();
+                const worldViewProjection = worldMatrix.multiply(viewProjection);
+                effect.setMatrix("worldViewProjection", worldViewProjection);
+                effect.setVector3("planetCenter", planet.position);
+            }
         };
     }
 
