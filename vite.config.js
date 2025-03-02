@@ -1,5 +1,14 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
-  base: '/planet-vlad/', // Ensure this matches your repository name
-});
+  plugins: [vue()],
+  base: '/planet-vlad/',
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+  },
+  server: {
+    port: 5174
+  }
+})
