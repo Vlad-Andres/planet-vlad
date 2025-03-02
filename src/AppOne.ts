@@ -86,15 +86,27 @@ export class AppOne {
     private async loadMeshes(scene: Scene, planet: Mesh): Promise<void> {
 
         // First load all tree models
-        await MeshLoader.loadTreeModels(scene);
+        await MeshLoader.loadModels(scene);
         
         PlanetTransition.registerMaterialMainLandmark(0, MeshLoader.getMesh("house") as Mesh, 34)
         PlanetTransition
             .registerMaterialMeshAssociation(0, MeshLoader.getMesh("tree1") as Mesh, 3, 12)
         PlanetTransition
-            .registerMaterialMeshAssociation(0, MeshLoader.getMesh("big-tree") as Mesh, 1, -1.6)
+            .registerMaterialMeshAssociation(0, MeshLoader.getMesh("bigTree") as Mesh, 1, -1.6)
         PlanetTransition
-            .registerMaterialMeshAssociation(0, MeshLoader.getMesh("tree-simple") as Mesh, 1, 600)
+            .registerMaterialMeshAssociation(0, MeshLoader.getMesh("treeSimple") as Mesh, 1, 600)
+        PlanetTransition
+            .registerMaterialMeshAssociation(0, MeshLoader.getMesh("grass") as Mesh, 50, 261)
+
+        PlanetTransition.registerMaterialMainLandmark(1, MeshLoader.getMesh("arch") as Mesh, 20)
+        PlanetTransition
+            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("largeBuilding") as Mesh, 7, 0)
+        PlanetTransition
+            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("largeBuilding2") as Mesh, 7, 0)
+        PlanetTransition
+            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("skyscraper") as Mesh, 1, 6)
+        PlanetTransition
+            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("statue") as Mesh, 10, 1.2)
     }
 
     createEnvironment(): void {

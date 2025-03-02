@@ -23,7 +23,7 @@ export class PlayerMovement {
     playerHeading!: Vector3;  // NEW: player's current tangent heading
     planet!: Mesh;
     private moveDirection = Vector3.Zero();
-    private readonly MOVE_SPEED = 0.05;
+    private readonly MOVE_SPEED = 0.07;
     private keysPressed: Set<string> = new Set();
     static playerUP: Vector3 = Vector3.Zero();
     private lastActionTime: number = 0;  // Track last action time
@@ -85,10 +85,10 @@ export class PlayerMovement {
                 this.movePlayerArc(-this.MOVE_SPEED);
             }
             if (this.keysPressed.has('a')) {
-                this.rotatePlayerHeading(0.05);
+                this.rotatePlayerHeading(0.1);
             }
             if (this.keysPressed.has('d')) {
-                this.rotatePlayerHeading(-0.05);
+                this.rotatePlayerHeading(-0.1);
             }
             if (this.keysPressed.has('n') && !PlanetTransition.transitionRunning) {
                 // Use BiomeManager instead of directly calling PlanetTransition

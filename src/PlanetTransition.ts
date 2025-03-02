@@ -10,9 +10,14 @@ import {
     Matrix,
     IndicesArray,
     InstancedMesh,
-    MultiMaterial
+    MultiMaterial,
+    StandardMaterial,
+    Texture,
+    Color3,
+    Material,
 } from '@babylonjs/core'
 import { Materials } from './Materials';
+import { FurMaterial } from '@babylonjs/materials';
 
 interface MaterialMeshAssociation {
     materialIndex: number
@@ -28,7 +33,7 @@ interface RandomVertexData {
     rotationMatrix: Matrix
     isTooClose: boolean
 }
-
+// TODO: make the landmark the gate to the next biome
 export class PlanetTransition {
     public static transitionRunning: boolean = false
     public static currentlyHiding: boolean = false
@@ -43,7 +48,12 @@ export class PlanetTransition {
 
     constructor(sphere: Mesh, debug: boolean) {
         const multiMaterial = Materials.getMultiMaterial();
-        sphere.material = multiMaterial;
+        sphere.material = Materials.getActiveMaterial();
+        // sphere.material.wireframe= true
+        
+        // We'll let the Materials class handle the fur material creation
+        // through its materialCallback system instead of creating it here
+        
         PlanetTransition.sphere = sphere;
         PlanetTransition.debug = debug;
     }
@@ -167,10 +177,25 @@ export class PlanetTransition {
         association: MaterialMeshAssociation,
         materialVertices: Vector3[],
     ): void {
-        const vertex = this.getRandomIndex(materialVertices, association.verticalOffset, 16)
+        // Maximum number of attempts to find a valid position
+        const MAX_ATTEMPTS = 50;
+        let attempts = 0;
+        let vertex;
 
+        // Keep trying to find a valid position until we succeed or run out of attempts
+        do {
+            vertex = this.getRandomIndex(materialVertices, association.verticalOffset, 16);
+            attempts++;
+
+            // If we've tried too many times, adjust the spacing requirements
+            if (attempts > MAX_ATTEMPTS / 2) {
+                vertex = this.getRandomIndex(materialVertices, association.verticalOffset, 8); // Try with smaller spacing
+            }
+        } while (vertex.isTooClose && attempts < MAX_ATTEMPTS);
+
+        // If we still couldn't find a position, force placement at the last attempted position
         if (vertex.isTooClose) {
-            return
+            console.warn('Could not find optimal landmark position, forcing placement');
         }
 
         const scale = 1;
@@ -255,11 +280,15 @@ export class PlanetTransition {
         association: MaterialMeshAssociation,
         materialVertices: Vector3[],
     ): void {
-        for (let i = 1; i <= association.density; i++) {
+        let i = 0
+        while(i< association.density) {
             const vertexData = this.getRandomIndex(materialVertices, association.verticalOffset)
+
             if (vertexData.isTooClose) {
+                i+= 0.5
                 continue;
             }
+            i++;
 
             const scale = 1;
             const scaleMatrix = Matrix.Scaling(scale, scale, scale);
@@ -367,7 +396,8 @@ export class PlanetTransition {
         if (!indices || !vertices) return;
         
         const i = faceIndex * 3;
-        const nextMaterialIndex = materialIndex
+        const nextMaterialIndex = materialIndex;
+        const currentMaterialIndex = Materials.getActiveMaterialIndex();
         
         // Create new submesh with the next material
         new SubMesh(
@@ -378,6 +408,11 @@ export class PlanetTransition {
             3,
             sphere
         );
+
+        // Only remove fur material if we're transitioning from grass (material 0)
+        if (currentMaterialIndex === 0 && nextMaterialIndex !== 0) {
+            sphere.material = Materials.getMultiMaterial();
+        }
     
         if (this.debug) {
             MeshBuilder.CreateLines("highlight", {
