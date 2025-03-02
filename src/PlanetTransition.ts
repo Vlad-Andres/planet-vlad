@@ -208,17 +208,15 @@ export class PlanetTransition {
             vertex = this.getRandomIndex(materialVertices, association.verticalOffset, 16);
             attempts++;
             
+            // Check if position is too close to player
+            const isTooCloseToPlayer = playerPosition && 
+                Vector3.Distance(vertex.liftedPosition, playerPosition) < MIN_PLAYER_DISTANCE;
+            
             // If we've tried too many times, adjust the spacing requirements
             if (attempts > MAX_ATTEMPTS / 2) {
                 vertex = this.getRandomIndex(materialVertices, association.verticalOffset, 8); // Try with smaller spacing
             }
-        } while (
-            (
-                vertex.isTooClose ||
-                (playerPosition && Vector3.Distance(vertex.liftedPosition, playerPosition) < MIN_PLAYER_DISTANCE)
-            ) &&
-                attempts < MAX_ATTEMPTS
-        );
+        } while ((vertex.isTooClose || (playerPosition && Vector3.Distance(vertex.liftedPosition, playerPosition) < MIN_PLAYER_DISTANCE)) && attempts < MAX_ATTEMPTS);
         
         // If we still couldn't find a position, force placement at the last attempted position
         if (vertex.isTooClose) {

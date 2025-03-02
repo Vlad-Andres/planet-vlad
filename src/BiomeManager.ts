@@ -65,10 +65,15 @@ export class BiomeManager {
                 this.horizonBlurEffect.onSizeChangedObservable.add(() => {
                     if (this.horizonBlurEffect) {
                         const effect = this.horizonBlurEffect.getEffect();
-                        if (effect) {
-                            effect.setFloat2("screenSize", 
-                                scene.getEngine().getRenderWidth(), 
-                                scene.getEngine().getRenderHeight());
+                        // Add additional null check before accessing effect methods
+                        if (effect && effect.setFloat2) {
+                            try {
+                                effect.setFloat2("screenSize", 
+                                    scene.getEngine().getRenderWidth(), 
+                                    scene.getEngine().getRenderHeight());
+                            } catch (error) {
+                                console.warn("Error updating screen size:", error);
+                            }
                         }
                     }
                 });
@@ -76,29 +81,28 @@ export class BiomeManager {
             
             // Add a render observer to update effect parameters each frame with improved error handling
             scene.onBeforeRenderObservable.add(() => {
-                if (this.horizonBlurEffect) {
-                    const planet = scene.getMeshByName("planet");
-                    if (planet && scene.activeCamera) {
-                        try {
-                            const worldMatrix = planet.getWorldMatrix();
-                            const viewProjection = scene.getTransformMatrix();
-                            const worldViewProjection = worldMatrix.multiply(viewProjection);
-                            
-                            // Get the effect from the post process
-                            const effect = this.horizonBlurEffect?.getEffect();
-                            if (effect) {
-                                effect.setMatrix("worldViewProjection", worldViewProjection);
-                                effect.setVector3("planetCenter", planet.position);
-                                
-                                // Update radius parameter for dynamic effect
-                                const distanceToCamera = Vector3.Distance(planet.position, scene.activeCamera.position);
-                                const dynamicRadius = Math.max(1.0, Math.min(3.0, distanceToCamera / 10));
-                                effect.setFloat("radius", dynamicRadius);
-                            }
-                        } catch (error) {
-                            console.warn("Error updating horizon blur effect:", error);
-                        }
-                    }
+                if (!this.horizonBlurEffect || !this.horizonBlurEffect.getEffect()) return;
+
+                const planet = scene.getMeshByName("planet");
+                if (!planet || !scene.activeCamera) return;
+
+                try {
+                    const worldMatrix = planet.getWorldMatrix();
+                    const viewProjection = scene.getTransformMatrix();
+                    const worldViewProjection = worldMatrix.multiply(viewProjection);
+                    
+                    const effect = this.horizonBlurEffect.getEffect();
+                    if (!effect || !effect.setMatrix || !effect.setVector3 || !effect.setFloat) return;
+
+                    effect.setMatrix("worldViewProjection", worldViewProjection);
+                    effect.setVector3("planetCenter", planet.position);
+                    
+                    // Update radius parameter for dynamic effect
+                    const distanceToCamera = Vector3.Distance(planet.position, scene.activeCamera.position);
+                    const dynamicRadius = Math.max(1.0, Math.min(3.0, distanceToCamera / 10));
+                    effect.setFloat("radius", dynamicRadius);
+                } catch (error) {
+                    console.warn("Error updating horizon blur effect:", error);
                 }
             });
 
@@ -108,6 +112,9 @@ export class BiomeManager {
         
         // Apply the initial biome (grass) environment immediately
         this.applyBiomeEnvironment(0);
+        
+        // Play the initial biome sound
+        this.playBiomeSound(this.biomes[0].soundPath);
         
         // Set the material index to match the grass biome (index 0)
         Materials.changeActiveMaterial(0);
@@ -138,7 +145,7 @@ export class BiomeManager {
                     }
                 },
                 "This is where it all began—my childhood in Moldova, surrounded by nature and simplicity.",
-                "sounds/nature_ambience.mp3"
+                "./sound/summer_sounds.mp3"
             ),
             
             // Biome 2: Brick (Material index 2 for brick)
@@ -161,7 +168,7 @@ export class BiomeManager {
                     }
                 },
                 "As I grew older, I moved to the city—a place of opportunities and challenges.",
-                "sounds/city_ambience.mp3"
+                "./sound/city.mp3"
             ),
             
             // Biome 3: Stone (Material index 0 for stone)
@@ -213,74 +220,124 @@ export class BiomeManager {
     }
 
     private static setupHorizonEffect(scene: Scene): void {
-        // Create custom horizon blur shader effect
-        Effect.ShadersStore["horizonBlurFragmentShader"] = `
-            varying vec2 vUV;
-            uniform sampler2D textureSampler;
-            uniform float radius;
-            uniform vec2 screenSize;
-            uniform float planetRadius;
-            uniform vec3 planetCenter;
-            uniform mat4 worldViewProjection;
-            
-            void main(void) {
-                vec4 baseColor = texture2D(textureSampler, vUV);
+        // Check if scene and camera are available
+        if (!scene || !scene.activeCamera) {
+            console.warn("Cannot setup horizon effect: Scene or active camera is not available");
+            return;
+        }
+
+        try {
+            // Create custom horizon blur shader effect
+            Effect.ShadersStore["horizonBlurFragmentShader"] = `
+                varying vec2 vUV;
+                uniform sampler2D textureSampler;
+                uniform float radius;
+                uniform vec2 screenSize;
+                uniform float planetRadius;
+                uniform vec3 planetCenter;
+                uniform mat4 worldViewProjection;
                 
-                // Calculate normalized screen coordinates
-                vec2 normalizedCoords = (vUV - 0.5) * 2.0;
-                float distFromCenter = length(normalizedCoords);
-                
-                // Define horizon parameters - adjusted for better visual effect
-                float horizonStart = 0.5;  // Where the horizon effect begins (reduced to start earlier)
-                float horizonEnd = 0.85;    // Where the horizon effect is strongest
-                
-                // Calculate blur strength based on distance from horizon
-                float horizonStrength = smoothstep(horizonStart, horizonEnd, distFromCenter);
-                
-                // Apply radial blur with more samples for smoother effect
-                vec4 blurredColor = vec4(0.0);
-                float totalWeight = 0.0;
-                int samples = 24; // Increased sample count for smoother blur
-                
-                for(int i = 0; i < samples; i++) {
-                    float angle = float(i) * (3.14159 * 2.0 / float(samples));
-                    vec2 offset = vec2(cos(angle), sin(angle)) * radius * horizonStrength * 0.07; // Increased blur intensity
-                    blurredColor += texture2D(textureSampler, vUV + offset);
-                    totalWeight += 1.0;
+                void main(void) {
+                    vec4 baseColor = texture2D(textureSampler, vUV);
+                    
+                    // Calculate normalized screen coordinates
+                    vec2 normalizedCoords = (vUV - 0.5) * 2.0;
+                    
+                    // Calculate distance from center of screen
+                    float distFromCenter = length(normalizedCoords);
+                    
+                    // Create a radial gradient for the horizon
+                    float horizonRadius = 0.1; // Adjust this to control where the horizon blur starts
+                    float horizonWidth = 0.1; // Adjust this to control how wide the blur transition is
+                    
+                    // Calculate blur strength based on distance from horizon circle
+                    float horizonStrength = smoothstep(
+                        horizonRadius - horizonWidth,
+                        horizonRadius + horizonWidth,
+                        distFromCenter
+                    );
+                    
+                    // Add vertical bias to make the blur stronger towards the bottom
+                    float verticalBias = smoothstep(0.0, 1.0, vUV.y);
+                    horizonStrength = mix(horizonStrength, horizonStrength * verticalBias, 0.7);
+                    
+                    // Apply radial blur with increased samples and radius
+                    vec4 blurredColor = vec4(0.0);
+                    float totalWeight = 0.0;
+                    int samples = 64; // Increased sample count for smoother blur
+                    float blurRadius = radius * 0.4; // Increased base blur radius
+                    
+                    for(int i = 0; i < samples; i++) {
+                        float angle = float(i) * (3.14159 * 2.0 / float(samples));
+                        // Create a spiral pattern for more natural blur
+                        float r = float(i) / float(samples);
+                        vec2 offset = vec2(
+                            cos(angle) * r,
+                            sin(angle) * r
+                        ) * blurRadius * horizonStrength;
+                        
+                        vec2 sampleUV = vUV + offset;
+                        // Add weight falloff based on distance
+                        float weight = 1.0 - length(offset) / blurRadius;
+                        weight = max(0.0, weight * weight); // Square for smoother falloff
+                        
+                        blurredColor += texture2D(textureSampler, sampleUV) * weight;
+                        totalWeight += weight;
+                    }
+                    
+                    blurredColor = blurredColor / totalWeight;
+                    
+                    // Enhanced blend between original and blurred color
+                    float finalBlendStrength = horizonStrength * 0.8; // Adjust blend strength
+                    gl_FragColor = mix(baseColor, blurredColor, finalBlendStrength);
                 }
-                
-                blurredColor /= totalWeight;
-                
-                // Blend between original and blurred color based on horizon strength
-                gl_FragColor = mix(baseColor, blurredColor, horizonStrength * 0.9); // Increased blend factor
-            }
-        `;
-        
-        // Create and apply the post-process
-        this.horizonBlurEffect = new PostProcess(
-            "HorizonBlur",
-            "horizonBlur",
-            ["radius", "screenSize", "planetRadius", "planetCenter", "worldViewProjection"],
-            null,
-            1.0,
-            scene.activeCamera
-        );
-        
-        this.horizonBlurEffect.onApply = (effect) => {
-            effect.setFloat("radius", 1.0);  // Increased blur radius
-            effect.setFloat2("screenSize", scene.getEngine().getRenderWidth(), scene.getEngine().getRenderHeight());
-            effect.setFloat("planetRadius", 8.0);  // Matches the planet's actual diameter
+            `;
             
-            // Get planet's world position and transform to screen space
-            const planet = scene.getMeshByName("planet");
-            if (planet) {
-                const worldMatrix = planet.getWorldMatrix();
-                const viewProjection = scene.getTransformMatrix();
-                const worldViewProjection = worldMatrix.multiply(viewProjection);
-                effect.setMatrix("worldViewProjection", worldViewProjection);
-                effect.setVector3("planetCenter", planet.position);
+            // Create and apply the post-process
+            this.horizonBlurEffect = new PostProcess(
+                "HorizonBlur",
+                "horizonBlur",
+                ["radius", "screenSize", "planetRadius", "planetCenter", "worldViewProjection"],
+                null,
+                1.0,
+                scene.activeCamera
+            );
+            
+            // Only set onApply if the effect was created successfully
+            if (this.horizonBlurEffect) {
+                this.horizonBlurEffect.onApply = (effect) => {
+                    if (!effect) return;
+                    
+                    try {
+                        effect.setFloat("radius", 4.0);  // Significantly increased blur radius for more pronounced effect
+                        
+                        // Safely get render dimensions
+                        const engine = scene.getEngine();
+                        if (engine) {
+                            effect.setFloat2("screenSize", engine.getRenderWidth(), engine.getRenderHeight());
+                        }
+                        
+                        effect.setFloat("planetRadius", 8.0);  // Matches the planet's actual diameter
+                        
+                        // Get planet's world position and transform to screen space
+                        const planet = scene.getMeshByName("planet");
+                        if (planet && scene.activeCamera) {
+                            const worldMatrix = planet.getWorldMatrix();
+                            const viewProjection = scene.getTransformMatrix();
+                            const worldViewProjection = worldMatrix.multiply(viewProjection);
+                            effect.setMatrix("worldViewProjection", worldViewProjection);
+                            effect.setVector3("planetCenter", planet.position);
+                        }
+                    } catch (error) {
+                        console.warn("Error in horizon blur effect onApply:", error);
+                    }
+                };
             }
-        };
+        } catch (error) {
+            console.error("Failed to setup horizon blur effect:", error);
+            // Make sure to set the effect to null if creation failed
+            this.horizonBlurEffect = null;
+        }
     }
 
     public static startBiomeTransition(scene: Scene): void {

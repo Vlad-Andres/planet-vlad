@@ -14,7 +14,9 @@ import {
     StandardMaterial,
     CubeTexture,
     Texture,
+    BlurPostProcess,
     Color3,
+    Vector2
 } from '@babylonjs/core'
 import { GLTFFileLoader } from "@babylonjs/loaders";
 import { Materials } from './Materials';
@@ -23,7 +25,6 @@ import { PlayerMovement } from './PlayerMovement';
 import { MeshLoader } from './MeshLoader';
 import { Inspector } from '@babylonjs/inspector';
 import { BiomeManager } from './BiomeManager';
-
 // import * as BABYLON from '@babylonjs/core'; 
 
 export class AppOne {
@@ -42,6 +43,31 @@ export class AppOne {
             this.engine.resize();
         });
         this.scene = this.createScene(this.engine)
+        console.log('CAAAANVAS' + canvas)
+        // Add blur effect initially
+        const blurPostProcess = new BlurPostProcess(
+            "blur",
+            new Vector2(4, 4),
+            2,
+            0.25,
+            null,
+            Texture.BILINEAR_SAMPLINGMODE,
+            this.engine
+        );
+        
+        // Listen for game start event from Vue component
+        document.addEventListener('game-start', () => {
+            if (this.scene.activeCamera) {
+                this.scene.activeCamera.detachPostProcess(blurPostProcess);
+            }
+            // Focus the canvas to enable keyboard controls
+            canvas.focus();
+        });
+        
+        if (this.scene.activeCamera) {
+            this.scene.activeCamera.attachPostProcess(blurPostProcess);
+        }
+
         this.createEnvironment()
         this.playerMovement = new PlayerMovement(this.planet, this.scene)
         this.setupCamera()
@@ -52,8 +78,6 @@ export class AppOne {
 
         // Initialize BiomeManager
         BiomeManager.initialize(this.scene)
-
-        // registerBuiltInLoaders();
     }
 
     debug(debugOn: boolean = true) {
