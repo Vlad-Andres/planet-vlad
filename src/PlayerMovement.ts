@@ -17,6 +17,7 @@ import {
 } from '@babylonjs/core'
 import { Materials } from './Materials';
 import { PlanetTransition } from './PlanetTransition';
+import { BiomeManager } from './BiomeManager';
 export class PlayerMovement {
     player!: Mesh;
     playerHeading!: Vector3;  // NEW: player's current tangent heading
@@ -90,7 +91,8 @@ export class PlayerMovement {
                 this.rotatePlayerHeading(-0.05);
             }
             if (this.keysPressed.has('n') && !PlanetTransition.transitionRunning) {
-                PlanetTransition.start(scene)
+                // Use BiomeManager instead of directly calling PlanetTransition
+                BiomeManager.startBiomeTransition(scene);
             }
         });
     }
