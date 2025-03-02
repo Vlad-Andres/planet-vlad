@@ -5,14 +5,19 @@ import {
     Texture,
     Material,
     PBRMaterial,
-    MultiMaterial
+    MultiMaterial,
+    Color3,
+    Vector3,
+    Mesh
 } from '@babylonjs/core'
+import { FurMaterial } from "@babylonjs/materials";
 export class Materials {
     private static materials: (PBRMaterial|Material)[] = []
     private static multiMaterial: MultiMaterial
     private static sphereUVScale: Vector2 = Vector2.FromArray([10, 10]);
     private static activeMaterialIndex: number = 0
     private scene: Scene
+    public static activeFurShells: Mesh[] = []
     private assets: string[] = [
         'grass',
         'asphalt',
@@ -20,13 +25,55 @@ export class Materials {
         'volcanic',
     ]
 
-    private materialConfigs: { [key: string]: { roughness: number, useAmbientOcclusionFromMetallicTextureRed: boolean, invertNormalMapX: boolean, invertNormalMapY: boolean, scale: number } } = {
+    private materialConfigs: { 
+        [key: string]: { 
+            roughness: number, 
+            useAmbientOcclusionFromMetallicTextureRed: boolean, 
+            invertNormalMapX: boolean, 
+            invertNormalMapY: boolean, 
+            scale: number,
+            materialCallback?: (scene: Scene) => void 
+        } 
+    } = {
         'grass': {
             roughness: 0.65,
             useAmbientOcclusionFromMetallicTextureRed: true,
             invertNormalMapX: true,
             invertNormalMapY: true,
-            scale: 1.0
+            scale: 1.0,
+            // materialCallback: (scene: Scene) => {
+            //     const furMaterial = new FurMaterial("furMaterial", scene);
+                
+            //     // Set base material properties
+            //     furMaterial.diffuseColor = new Color3(0.1, 0.5, 0.1);
+            //     furMaterial.furColor = new Color3(0.1, 0.5, 0.1);
+                
+            //     // Generate and apply fur texture first
+            //     const furTexture = FurMaterial.GenerateTexture("furTexture", scene);
+            //     furMaterial.furTexture = furTexture;
+                
+            //     // Adjust fur properties for grass-like appearance
+            //     furMaterial.furLength = 0.3;
+            //     furMaterial.furAngle = 0;
+            //     furMaterial.furSpacing = 0.1;
+            //     furMaterial.furDensity = 15;
+            //     furMaterial.furGravity = new Vector3(0, -0.2, 0);
+                
+            //     // Enable high-level fur with animation
+            //     furMaterial.highLevelFur = true;
+            //     furMaterial.furTime = 0;
+            //     furMaterial.furSpeed = 200;
+            //     furMaterial.furSpacing = 0.5;
+                
+            //     // Get the planet mesh and apply the fur material
+            //     const sphere = scene.getMeshByName('planet') as Mesh;
+            //     sphere.material = furMaterial;
+                
+            //     // Generate fur layers
+            //     const furShells = FurMaterial.FurifyMesh(sphere, 30);
+            //     // Store the shells for later use
+            //     Materials.activeFurShells = furShells as Mesh[];
+            // }
         },
         'asphalt': {
             roughness: 0.8,
@@ -45,16 +92,23 @@ export class Materials {
         'volcanic': {
             roughness: 0.9,
             useAmbientOcclusionFromMetallicTextureRed: true,
-            invertNormalMapX: true,
+            invertNormalMapX: false,
             invertNormalMapY: true,
-            scale: 5.0
+            scale: 8.0
         }
     }
 
     constructor(scene: Scene) {
         this.scene = scene
         this.assets.forEach(asset => {
-            Materials.materials.push(this.getPBR(asset))
+            const material = this.getPBR(asset);
+            Materials.materials.push(material);
+            
+            // Execute material callback if it exists
+            const config = this.materialConfigs[asset];
+            if (config.materialCallback) {
+                config.materialCallback(scene);
+            }
         });
         this.setMultiMaterial()
     }
@@ -111,7 +165,7 @@ export class Materials {
         this.multiMaterial.dispose();
     }
 
-    getPBR(asset: string): PBRMaterial {
+    getPBR(asset: string): PBRMaterial | Material {
         const sphereUVScale = Materials.sphereUVScale
         const material = new PBRMaterial('material', this.scene)
         const texturesArray: Texture[] = []
@@ -135,6 +189,7 @@ export class Materials {
 
         // Apply material configuration based on asset type
         const config = this.materialConfigs[asset]
+
         material.roughness = config.roughness
         material.useAmbientOcclusionFromMetallicTextureRed = config.useAmbientOcclusionFromMetallicTextureRed
         material.invertNormalMapX = config.invertNormalMapX
@@ -143,7 +198,12 @@ export class Materials {
         texturesArray.forEach(texture => {
             texture.uScale = config.scale
             texture.vScale = config.scale
+            texture.vAng = 0
+            texture.wAng = 0
+            texture.uAng = 0
         });
+
+        // material.useTrypla
 
         return material
     }
