@@ -31,6 +31,13 @@
       </div>
     </div>
     
+    <!-- Loading Screen -->
+    <LoadingScreen 
+      :visible="isLoading" 
+      :progress="loadingProgress" 
+      :loading-status="loadingStatus" 
+    />
+    
     <!-- About section that appears when scrolling down -->
     <div class="about-section" ref="aboutSection">
       <div class="about-content">
@@ -79,45 +86,67 @@
 
 <script>
 import { ref, onMounted, nextTick } from 'vue';
-import { AppOne } from '../AppOne'; // Make sure this path is correct
+import { AppOne } from '../AppOne';
+import LoadingScreen from './LoadingScreen.vue';
+import { MeshLoader } from '../MeshLoader';
 
 export default {
   name: 'GameIntro',
+  components: {
+    LoadingScreen
+  },
   setup() {
     const isOverlayHidden = ref(false);
     const aboutSection = ref(null);
+    const isLoading = ref(false);
+    const loadingProgress = ref(0);
+    const loadingStatus = ref('Initializing...');
     let app = null;
     
-    const startGame = () => {
+    const startGame = async () => {
       isOverlayHidden.value = true;
-      // Start the game
-      document.dispatchEvent(new Event('game-start'));
-      nextTick(() => {
-        const canvas = document.getElementById('renderCanvas');
-        if (canvas) {
-          canvas.focus();
-          canvas.style.outline = 'none';
-          // Add event listener to maintain focus
-          window.addEventListener('click', () => {
-            if (document.activeElement !== canvas) {
-              canvas.focus();
-            }
-          });
-        }
-      });
+      isLoading.value = true;
+      
+      // Initialize game after button click
+      const canvas = document.getElementById('renderCanvas');
+      if (canvas) {
+        // Create the AppOne instance
+        app = new AppOne(canvas);
+        
+        // Register loading callback
+        MeshLoader.registerLoadingCallback((progress, status) => {
+          loadingProgress.value = progress;
+          loadingStatus.value = status;
+        });
+        
+        // Initialize the game but don't start rendering yet
+        await app.initialize();
+        
+        // Hide loading screen and start the game
+        isLoading.value = false;
+        app.run();
+        
+        // Dispatch game-start event
+        document.dispatchEvent(new Event('game-start'));
+        
+        // Focus the canvas
+        canvas.focus();
+        canvas.style.outline = 'none';
+        
+        // Add event listener to maintain focus
+        window.addEventListener('click', () => {
+          if (document.activeElement !== canvas) {
+            canvas.focus();
+          }
+        });
+      }
     };
 
     const hideOverlay = () => {
       isOverlayHidden.value = true;
-      // Dispatch game-start event
     };
     
     onMounted(() => {
-      // Initialize Babylon.js game
-      const canvas = document.getElementById('renderCanvas');
-      app = new AppOne(canvas);
-      app.run();
-      
       // Setup scroll listener to show/hide overlay based on scroll position
       window.addEventListener('scroll', () => {
         const scrollPosition = window.scrollY;
@@ -141,7 +170,10 @@ export default {
       isOverlayHidden,
       hideOverlay,
       startGame,
-      aboutSection
+      aboutSection,
+      isLoading,
+      loadingProgress,
+      loadingStatus
     };
   }
 }

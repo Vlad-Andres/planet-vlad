@@ -157,9 +157,35 @@ export class MeshLoader {
     };
 
     private static loadedMeshes: Map<string, AbstractMesh> = new Map();
+    private static totalModels: number = 0;
+    private static loadedModelsCount: number = 0;
+    private static loadingStatus: string = '';
+    private static loadingProgressCallbacks: ((progress: number, status: string) => void)[] = [];
+
+    public static registerLoadingCallback(callback: (progress: number, status: string) => void): void {
+        this.loadingProgressCallbacks.push(callback);
+    }
+
+    private static updateLoadingProgress(status: string): void {
+        this.loadingStatus = status;
+        this.loadedModelsCount++;
+        const progress = (this.loadedModelsCount / this.totalModels) * 100;
+        
+        for (const callback of this.loadingProgressCallbacks) {
+            callback(progress, status);
+        }
+    }
 
     public static async loadModels(scene: Scene): Promise<void> {
         try {
+            // Count total models to load for progress tracking
+            this.totalModels = 
+                Object.keys(this.models.trees).length + 
+                Object.keys(this.models.buildings).length + 
+                Object.keys(this.models.environment).length;
+            
+            this.loadedModelsCount = 0;
+            
             await Promise.all([
                 this.loadTreeModels(scene),
                 this.loadBuildingModels(scene),
@@ -226,6 +252,7 @@ export class MeshLoader {
 
     private static async loadModel(scene: Scene, model: ModelConfig): Promise<void> {
         try {
+            this.loadingStatus = `Loading ${model.name}...`;
             const result = await SceneLoader.ImportMeshAsync('', model.path, model.file, scene);
             const parent = result.meshes[0];
     
@@ -253,9 +280,13 @@ export class MeshLoader {
             parent.dispose();
             this.loadedMeshes.set(model.name, mergedMesh);
             this.optimizeMesh(mergedMesh);
+            
+            // Update loading progress
+            this.updateLoadingProgress(`Loaded ${model.name}`);
     
         } catch (error) {
             console.error(`Error loading model ${model.file}:`, error);
+            this.updateLoadingProgress(`Error loading ${model.name}`);
             throw error; // Propagate error for proper handling
         }
     }
