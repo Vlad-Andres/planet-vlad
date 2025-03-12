@@ -49,6 +49,10 @@ export class BiomeManager {
     private static scene: Scene | null = null;
     private static initialized: boolean = false;
     private static horizonBlurEffect: PostProcess | null = null;
+    private static lastBiomeChangeTime: number = 0;
+    private static cooldownPeriod: number = 20000; // 20 seconds in milliseconds
+    private static cooldownMessage: TextBlock | null = null;
+    private static cooldownUI: AdvancedDynamicTexture | null = null;
 
     public static initialize(scene: Scene): void {
         if (this.initialized) return;
@@ -118,6 +122,9 @@ export class BiomeManager {
         
         // Set the material index to match the grass biome (index 0)
         Materials.changeActiveMaterial(0);
+        
+        // Show the narrative for the first biome
+        this.showInitialBiomeMessage(scene);
         
         this.initialized = true;
     }
@@ -340,8 +347,20 @@ export class BiomeManager {
         }
     }
 
-    public static startBiomeTransition(scene: Scene): void {
+    public static startBiomeTransition(scene: Scene): boolean {
         if (!this.initialized) this.initialize(scene);
+        
+        // Check if enough time has passed since the last biome change
+        const currentTime = Date.now();
+        const timeSinceLastChange = currentTime - this.lastBiomeChangeTime;
+        
+        if (timeSinceLastChange < this.cooldownPeriod) {
+            console.log('too soon')
+            // Not enough time has passed, show cooldown message
+            const remainingTime = Math.ceil((this.cooldownPeriod - timeSinceLastChange) / 1000);
+            this.showCooldownMessage(scene, remainingTime);
+            return false;
+        }
         
         // Get next biome index
         const nextBiomeIndex = (this.currentBiomeIndex + 1) % this.biomes.length;
@@ -350,19 +369,21 @@ export class BiomeManager {
         // Start the vertex transition using your existing system
         PlanetTransition.start(scene);
         
-        // This works because your PlanetTransition class will naturally call Materials.changeActiveMaterial()
-        // when the transition is complete
+        // Update the last biome change time
+        this.lastBiomeChangeTime = currentTime;
         
         // Schedule applying the rest of the biome changes for when the transition completes
         // This requires adding an event or callback system to your PlanetTransition
         this.setupTransitionCallback(scene, nextBiomeIndex);
+        return true;
     }
     
     private static setupTransitionCallback(scene: Scene, nextBiomeIndex: number): void {
 
         // Transition is complete, apply the rest of the biome changes
         this.applyBiomeEnvironment(nextBiomeIndex);
-        this.showBiomeNarrative(this.biomes[nextBiomeIndex].narrative);
+        // Remove narrative display
+        // this.showBiomeNarrative(this.biomes[nextBiomeIndex].narrative);
         this.playBiomeSound(this.biomes[nextBiomeIndex].soundPath);
 
         // Check every frame if the transition is complete
@@ -406,47 +427,140 @@ export class BiomeManager {
             ambientLight.diffuse = biome.lightSettings.ambientLight.diffuse;
             ambientLight.groundColor = biome.lightSettings.ambientLight.groundColor;
         }
+        
+        // Update the last biome change time when environment is applied
+        // This ensures the cooldown starts when the biome is actually loaded
+        this.lastBiomeChangeTime = Date.now();
     }
     
     private static showBiomeNarrative(narrative: string): void {
+        // Do nothing - narrative display is disabled
+        return;
+    }
+    
+    private static showCooldownMessage(scene: Scene, remainingTime: number): void {
         if (!this.scene) return;
         
         // Clean up previous UI if exists
-        if (this.narrativeUI) {
-            this.narrativeUI.dispose();
+        if (this.cooldownUI) {
+            this.cooldownUI.dispose();
         }
         
         // Create fullscreen UI
-        this.narrativeUI = AdvancedDynamicTexture.CreateFullscreenUI("BiomeNarrativeUI", true, this.scene);
+        this.cooldownUI = AdvancedDynamicTexture.CreateFullscreenUI("BiomeCooldownUI", true, this.scene);
         
         // Create container for text
-        const container = new Container("narrativeContainer");
+        const container = new Container("cooldownContainer");
         container.width = 0.8;
-        container.height = "100px";
+        container.height = "80px"; // Reduced height since we only show cooldown message
         container.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
         container.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
         container.top = "-50px";
         container.zIndex = 10;
-        container.background = "rgba(0, 0, 0, 0.5)";
-        this.narrativeUI.addControl(container);
+        container.background = "rgba(0, 0, 0, 0.7)";
+        this.cooldownUI.addControl(container);
         
-        // Create text block
-        const textBlock = new TextBlock("narrativeText");
-        textBlock.text = narrative;
-        textBlock.color = "white";
-        textBlock.fontSize = 18;
-        textBlock.textWrapping = true;
-        textBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-        textBlock.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
-        container.addControl(textBlock);
+        // Create text block for cooldown message only
+        this.cooldownMessage = new TextBlock("cooldownText");
+        this.cooldownMessage.text = `Please wait ${remainingTime} seconds before changing biomes...`;
+        this.cooldownMessage.color = "#FFA500"; // Orange color for warning
+        this.cooldownMessage.fontSize = 16;
+        this.cooldownMessage.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+        this.cooldownMessage.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+        container.addControl(this.cooldownMessage);
         
-        // Fade out narrative after a few seconds
-        setTimeout(() => {
-            if (this.narrativeUI) {
-                this.narrativeUI.dispose();
-                this.narrativeUI = null;
+        // Update the countdown timer every second
+        let timeRemaining = remainingTime;
+        const countdownInterval = setInterval(() => {
+            timeRemaining--;
+            if (timeRemaining <= 0) {
+                clearInterval(countdownInterval);
+                if (this.cooldownUI) {
+                    this.cooldownUI.dispose();
+                    this.cooldownUI = null;
+                    this.cooldownMessage = null;
+                }
+            } else if (this.cooldownMessage) {
+                this.cooldownMessage.text = `Please wait ${timeRemaining} seconds before changing biomes...`;
             }
-        }, 6000);
+        }, 1000);
+        
+        // Auto-dispose after the cooldown period ends
+        setTimeout(() => {
+            clearInterval(countdownInterval);
+            if (this.cooldownUI) {
+                this.cooldownUI.dispose();
+                this.cooldownUI = null;
+                this.cooldownMessage = null;
+            }
+        }, remainingTime * 1000);
+    }
+    
+    private static showInitialBiomeMessage(scene: Scene): void {
+        if (!this.scene) return;
+        
+        // Set the lastBiomeChangeTime to current time to start the cooldown period
+        this.lastBiomeChangeTime = Date.now();
+        
+        // Create fullscreen UI
+        this.cooldownUI = AdvancedDynamicTexture.CreateFullscreenUI("BiomeInitialUI", true, this.scene);
+        
+        // Create container for text
+        const container = new Container("initialBiomeContainer");
+        container.width = 0.8;
+        container.height = "120px"; // Taller container to fit both narrative and cooldown message
+        container.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+        container.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+        container.top = "-50px";
+        container.zIndex = 10;
+        container.background = "rgba(0, 0, 0, 0.7)";
+        this.cooldownUI.addControl(container);
+        
+        // Create text block for biome narrative
+        const narrativeText = new TextBlock("narrativeText");
+        narrativeText.text = this.biomes[0].narrative;
+        narrativeText.color = "#FFFFFF";
+        narrativeText.fontSize = 18;
+        narrativeText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+        narrativeText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+        narrativeText.paddingTop = "10px";
+        container.addControl(narrativeText);
+        
+        // Create text block for cooldown message
+        this.cooldownMessage = new TextBlock("cooldownText");
+        this.cooldownMessage.text = `Please wait ${Math.ceil(this.cooldownPeriod / 1000)} seconds before changing biomes...`;
+        this.cooldownMessage.color = "#FFA500"; // Orange color for warning
+        this.cooldownMessage.fontSize = 16;
+        this.cooldownMessage.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+        this.cooldownMessage.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+        this.cooldownMessage.paddingBottom = "10px";
+        container.addControl(this.cooldownMessage);
+        
+        // Update the countdown timer every second
+        let timeRemaining = Math.ceil(this.cooldownPeriod / 1000);
+        const countdownInterval = setInterval(() => {
+            timeRemaining--;
+            if (timeRemaining <= 0) {
+                clearInterval(countdownInterval);
+                if (this.cooldownUI) {
+                    this.cooldownUI.dispose();
+                    this.cooldownUI = null;
+                    this.cooldownMessage = null;
+                }
+            } else if (this.cooldownMessage) {
+                this.cooldownMessage.text = `Please wait ${timeRemaining} seconds before changing biomes...`;
+            }
+        }, 1000);
+        
+        // Auto-dispose after the cooldown period ends
+        setTimeout(() => {
+            clearInterval(countdownInterval);
+            if (this.cooldownUI) {
+                this.cooldownUI.dispose();
+                this.cooldownUI = null;
+                this.cooldownMessage = null;
+            }
+        }, this.cooldownPeriod);
     }
     
     private static playBiomeSound(soundPath: string): void {
