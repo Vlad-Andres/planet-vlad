@@ -32,7 +32,8 @@ export class AppOne {
     scene: Scene;
     planet!: Mesh;
     camera!: FollowCamera;
-    playerMovement: PlayerMovement
+    playerMovement!: PlayerMovement;
+    blurPostProcess: BlurPostProcess;
 
     materials: PBRMaterial[] = [];
     currentMaterialIndex = 0;
@@ -44,8 +45,9 @@ export class AppOne {
         });
         this.scene = this.createScene(this.engine)
         console.log('CAAAANVAS' + canvas)
+        
         // Add blur effect initially
-        const blurPostProcess = new BlurPostProcess(
+        this.blurPostProcess = new BlurPostProcess(
             "blur",
             new Vector2(4, 4),
             2,
@@ -58,26 +60,31 @@ export class AppOne {
         // Listen for game start event from Vue component
         document.addEventListener('game-start', () => {
             if (this.scene.activeCamera) {
-                this.scene.activeCamera.detachPostProcess(blurPostProcess);
+                this.scene.activeCamera.detachPostProcess(this.blurPostProcess);
             }
             // Focus the canvas to enable keyboard controls
             canvas.focus();
         });
+    }
+
+    // New method to initialize the game without starting the render loop
+    async initialize(): Promise<void> {
+        // Create the environment and setup camera
+        this.createEnvironment();
+        this.playerMovement = new PlayerMovement(this.planet, this.scene);
+        this.setupCamera();
+        new PlanetTransition(this.planet, false);
         
+        // Attach blur effect to camera
         if (this.scene.activeCamera) {
-            this.scene.activeCamera.attachPostProcess(blurPostProcess);
+            this.scene.activeCamera.attachPostProcess(this.blurPostProcess);
         }
-
-        this.createEnvironment()
-        this.playerMovement = new PlayerMovement(this.planet, this.scene)
-        this.setupCamera()
-        new PlanetTransition(this.planet, false)
-        this.loadMeshes(this.scene, this.planet).then(() => {
-            PlanetTransition.imediatelySpawnAll(this.scene)
-        }); 
-
+        
+        // Load all meshes before starting the game
+        await this.loadMeshes(this.scene, this.planet);
+        
         // Initialize BiomeManager
-        BiomeManager.initialize(this.scene)
+        BiomeManager.initialize(this.scene);
     }
 
     debug(debugOn: boolean = true) {
@@ -108,7 +115,6 @@ export class AppOne {
     }
 
     private async loadMeshes(scene: Scene, planet: Mesh): Promise<void> {
-
         // First load all tree models
         await MeshLoader.loadModels(scene);
         
@@ -147,7 +153,10 @@ export class AppOne {
             .registerMaterialMeshAssociation(3, MeshLoader.getMesh("brad") as Mesh, 150, -1)
         PlanetTransition
             .registerMaterialMeshAssociation(3, MeshLoader.getMesh("seagull") as Mesh, 1, 220)
-        }
+        
+        // Spawn all objects after loading
+        PlanetTransition.imediatelySpawnAll(this.scene);
+    }
 
     createEnvironment(): void {
         const scene = this.scene
