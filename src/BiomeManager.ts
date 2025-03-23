@@ -50,7 +50,7 @@ export class BiomeManager {
     private static initialized: boolean = false;
     private static horizonBlurEffect: PostProcess | null = null;
     private static lastBiomeChangeTime: number = 0;
-    private static cooldownPeriod: number = 20000; // 20 seconds in milliseconds
+    private static cooldownPeriod: number = 2000; // 20 seconds in milliseconds
     private static cooldownMessage: TextBlock | null = null;
     private static cooldownUI: AdvancedDynamicTexture | null = null;
 

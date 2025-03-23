@@ -101,9 +101,11 @@ export class PlayerMovement {
         const distance = Vector3.Distance(this.player.position, instancePosition);
         console.log(`Distance to landmark: ${distance}, Threshold: ${baseThreshold}`);
         
-        if (distance < baseThreshold && BiomeManager.startBiomeTransition(this.player.getScene())) {
-            this.currentBiomIndex++;
-        }
+        // tODO: Problem here
+        
+        // if (distance < baseThreshold && BiomeManager.startBiomeTransition(this.player.getScene())) {
+        //     this.currentBiomIndex++;
+        // }
     }
 
     private setupControls(scene: Scene): void {

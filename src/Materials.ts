@@ -110,15 +110,6 @@ export class Materials {
                 config.materialCallback(scene);
             }
         });
-        this.setMultiMaterial()
-    }
-
-    private setMultiMaterial(): void {
-        const multiMaterial = new MultiMaterial("multiMaterial", this.scene);
-        for (let i = 0; i < Materials.getMaterialsCount(); i++) {
-            multiMaterial.subMaterials.push(Materials.get(i))
-        }
-        Materials.multiMaterial = multiMaterial
     }
 
     public static getActiveMaterialIndex(): number {
@@ -126,7 +117,14 @@ export class Materials {
     }
 
     public static getActiveMaterial(): Material {
-        return Materials.get(Materials.activeMaterialIndex) as Material
+        const material = Materials.get(Materials.activeMaterialIndex) as Material;
+        // Ensure material is ready for use
+        if (material) {
+            if (material instanceof PBRMaterial || material instanceof StandardMaterial) {
+                material.markAsDirty(Material.AllDirtyFlag);
+            }
+        }
+        return material;
     }
 
     public static getNextActiveMaterial(): number {
@@ -142,6 +140,11 @@ export class Materials {
 
         // Get the new material
         const newMaterial = this.materials[this.activeMaterialIndex];
+        
+        // Ensure the new material is ready for use
+        if (newMaterial) {
+            newMaterial.markAsDirty(Material.AllDirtyFlag);
+        }
     }
     
 

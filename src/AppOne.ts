@@ -91,7 +91,7 @@ export class AppOne {
         if (debugOn) {
             Inspector.Show(this.scene, {});
 
-            // this.scene.debugLayer.show({ overlay: true });
+            this.scene.debugLayer.show({ overlay: true });
         } else {
             this.scene.debugLayer.hide();
         }
