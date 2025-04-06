@@ -345,9 +345,9 @@ export class BiomeManager {
             // Make sure to set the effect to null if creation failed
             this.horizonBlurEffect = null;
         }
-    }
+    } 
 
-    public static startBiomeTransition(scene: Scene): boolean {
+    public static goToNextBiome(scene: Scene): boolean {
         if (!this.initialized) this.initialize(scene);
         
         // Check if enough time has passed since the last biome change
@@ -367,7 +367,7 @@ export class BiomeManager {
         const nextBiome = this.biomes[nextBiomeIndex];
         
         // Start the vertex transition using your existing system
-        PlanetTransition.start(scene);
+        PlanetTransition.do(scene);
         
         // Update the last biome change time
         this.lastBiomeChangeTime = currentTime;
@@ -388,7 +388,7 @@ export class BiomeManager {
 
         // Check every frame if the transition is complete
         const observer = scene.onBeforeRenderObservable.add(() => {
-            if (!PlanetTransition.transitionRunning && Materials.getActiveMaterialIndex() === this.biomes[nextBiomeIndex].materialIndex) {
+            if (Materials.getActiveMaterialIndex() === this.biomes[nextBiomeIndex].materialIndex) {
                 
                 // Update current biome index
                 this.currentBiomeIndex = nextBiomeIndex;

@@ -67,17 +67,13 @@ export class PlayerMovement {
         if (currentTime - this.lastActionTime < this.ACTION_DELAY) {
             return; // Skip if not enough time has passed
         }
-        if (PlanetTransition.transitionRunning && !PlanetTransition.currentlyHiding) {
-            console.log('running')
-            this.lastActionTime = currentTime;
-            PlanetTransition.transitHiddenFaces(scene)
-        }
+        console.log('running')
+        this.lastActionTime = currentTime;
+        PlanetTransition.do(scene)
     }
 
     // Assume playerHeading is already defined and normalized.
     private checkLandmarkProximity(): void {
-        if (PlanetTransition.transitionRunning) return;
-
         const landmark = PlanetTransition.getCurrentLandmark();
         if (!landmark) return;
 
@@ -110,7 +106,7 @@ export class PlayerMovement {
 
     private setupControls(scene: Scene): void {
         scene.onKeyboardObservable.add((kbInfo) => {
-            this.runTransitionIfApplicable(scene)
+            // this.runTransitionIfApplicable(scene)
             const key = kbInfo.event.key.toLowerCase();
             if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
                 this.keysPressed.add(key);
@@ -132,9 +128,9 @@ export class PlayerMovement {
             if (this.keysPressed.has('d')) {
                 this.rotatePlayerHeading(-0.1);
             }
-            if (this.keysPressed.has('n') && !PlanetTransition.transitionRunning) {
+            if (this.keysPressed.has('n')) {
                 // Use BiomeManager instead of directly calling PlanetTransition
-                BiomeManager.startBiomeTransition(scene);
+                BiomeManager.goToNextBiome(scene);
             }
         });
     }

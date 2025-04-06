@@ -271,26 +271,26 @@ export class PlanetTransition {
         }
     }
 
-    public static start(scene: Scene): void {
-        console.log('Starting immediate biome transition');
+    public static do(scene: Scene): void {
         const sphere = scene.getMeshByName('planet') as Mesh;
         this.sphere = sphere; // Ensure sphere is set
         
         // Set transition flag
-        this.transitionRunning = true;
+        // this.transitionRunning = true;
         
         // Remove all existing mesh instances from the current biome
         this.removeThinInstancesFromPreviousMaterial([]);
         
         // Update the material index to the next biome
         Materials.changeActiveMaterial();
+        sphere.material = Materials.getActiveMaterial();
         
         // Generate random positions on the sphere surface for placing meshes
         const randomPositions = this.generateRandomPositionsOnSphere(sphere, 100); // Increased from 50 to 100 positions
         
         // Get the next material index
         const nextMaterialIndex = Materials.getActiveMaterialIndex();
-        console.log('Next material index:', nextMaterialIndex);
+
         // Reset all mesh templates to their initial state
         this.materialAssociations.forEach(association => {
             if (association.meshTemplate) {
@@ -322,11 +322,9 @@ export class PlanetTransition {
         }
         
         // Apply the new material directly
-        sphere.material = Materials.getActiveMaterial();
         
         // Complete the transition
-        this.resetVariables(nextMaterialIndex);
-        this.transitionRunning = false;
+        // this.resetVariables(nextMaterialIndex);
     }
 
     public static imediatelySpawnAll(scene: Scene) {
@@ -387,14 +385,14 @@ export class PlanetTransition {
         // this.resetVariables();
     }
 
-    public static transitHiddenFaces(scene: Scene): void {
-        console.log("Starting immediate transition");
+    // public static transitHiddenFaces(scene: Scene): void {
+    //     console.log("Starting immediate transition");
         
-        // Simply call the start method which now handles the entire transition
-        this.start(scene);
+    //     // Simply call the start method which now handles the entire transition
+    //     this.do(scene);
         
-        console.log("Transition complete");
-    }
+    //     console.log("Transition complete");
+    // }
 
 
     private static resetVariables(materialIndex? :number): void {

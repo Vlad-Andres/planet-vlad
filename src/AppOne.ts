@@ -170,14 +170,14 @@ constructor(readonly canvas: HTMLCanvasElement) {
         // First load all tree models
         await MeshLoader.loadModels(scene).then(() => {
             PlanetTransition.registerMaterialMainLandmark(0, MeshLoader.getMesh("house") as Mesh, 34)
-            // PlanetTransition
-            //     .registerMaterialMeshAssociation(0, MeshLoader.getMesh("tree1") as Mesh, 3, 12)
-            // PlanetTransition
-            //     .registerMaterialMeshAssociation(0, MeshLoader.getMesh("bigTree") as Mesh, 1, -1.6)
-            // PlanetTransition
-            //     .registerMaterialMeshAssociation(0, MeshLoader.getMesh("treeSimple") as Mesh, 1, 600)
-            // PlanetTransition
-            //     .registerMaterialMeshAssociation(0, MeshLoader.getMesh("grass") as Mesh, 50, 261)
+            PlanetTransition
+                .registerMaterialMeshAssociation(0, MeshLoader.getMesh("tree1") as Mesh, 3, 12)
+            PlanetTransition
+                .registerMaterialMeshAssociation(0, MeshLoader.getMesh("bigTree") as Mesh, 1, -1.6)
+            PlanetTransition
+                .registerMaterialMeshAssociation(0, MeshLoader.getMesh("treeSimple") as Mesh, 1, 600)
+            PlanetTransition
+                .registerMaterialMeshAssociation(0, MeshLoader.getMesh("grass") as Mesh, 50, 261)
     
             PlanetTransition.registerMaterialMainLandmark(1, MeshLoader.getMesh("arch") as Mesh, 20)
             PlanetTransition
