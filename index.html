@@ -29,10 +29,44 @@
       width: 100%;
       height: 100%;
       pointer-events: none; /* Allow events to pass through to canvas */
+      z-index: 10; /* Ensure app is above canvas but below inspector */
     }
 
     #app > * {
       pointer-events: auto; /* Re-enable pointer events for app children */
+    }
+    
+    /* Ensure Babylon Inspector is visible above all other elements */
+    .inspector-container {
+      z-index: 1000 !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      pointer-events: auto !important;
+    }
+    
+    /* Fix for Inspector panels visibility */
+    #scene-explorer-host {
+      left: 0 !important;
+      max-width: 100% !important;
+      min-width: 300px !important;
+      background-color: #333333 !important;
+    }
+    
+    #inspector-host {
+      right: 0 !important;
+      max-width: 100% !important;
+      min-width: 300px !important;
+    }
+    
+    /* Ensure the split bar is visible and draggable */
+    #split-bar {
+      position: absolute !important;
+      width: 5px !important;
+      background-color: #555555 !important;
+      cursor: col-resize !important;
     }
   </style>
 </head>

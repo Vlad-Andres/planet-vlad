@@ -27,6 +27,10 @@ import { Inspector } from '@babylonjs/inspector';
 import { BiomeManager } from './BiomeManager';
 // import * as BABYLON from '@babylonjs/core'; 
 
+/**
+ * Main application class that manages the 3D planet environment, camera, and game initialization.
+ * Handles rendering, scene setup, and coordinates all game components.
+ */
 export class AppOne {
     engine: Engine;
     scene: Scene;
@@ -38,7 +42,13 @@ export class AppOne {
     materials: PBRMaterial[] = [];
     currentMaterialIndex = 0;
 
-    constructor(readonly canvas: HTMLCanvasElement) {
+/**
+ * Creates a new AppOne instance and initializes the Babylon.js engine and scene.
+ * Sets up event listeners and creates the initial blur post-process effect.
+ * 
+ * @param canvas - The HTML canvas element where the 3D scene will be rendered
+ */
+constructor(readonly canvas: HTMLCanvasElement) {
         this.engine = new Engine(canvas)
         window.addEventListener('resize', () => {
             this.engine.resize();
@@ -67,8 +77,15 @@ export class AppOne {
         });
     }
 
-    // New method to initialize the game without starting the render loop
+    /**
+     * Initializes the game environment without starting the render loop.
+     * Creates the planet, player, camera, and loads all necessary meshes.
+     * Applies initial visual effects and prepares the scene for gameplay.
+     * 
+     * @returns A promise that resolves when initialization is complete
+     */
     async initialize(): Promise<void> {
+        console.log('Initializing AppOne...');
         // Create the environment and setup camera
         this.createEnvironment();
         this.playerMovement = new PlayerMovement(this.planet, this.scene);
@@ -81,29 +98,56 @@ export class AppOne {
         }
         
         // Load all meshes before starting the game
-        await this.loadMeshes(this.scene, this.planet);
-        
-        // Initialize BiomeManager
-        BiomeManager.initialize(this.scene);
+        await this.loadMeshes(this.scene, this.planet)
+        .then(() => {
+            BiomeManager.initialize(this.scene);
+            // Spawn all objects after loading
+            PlanetTransition.imediatelySpawnAll(this.scene);
+        });        
     }
 
+    /**
+     * Toggles the Babylon.js Inspector for debugging purposes.
+     * 
+     * @param debugOn - Whether to enable (true) or disable (false) the debug layer
+     */
     debug(debugOn: boolean = true) {
         if (debugOn) {
-            Inspector.Show(this.scene, {});
-
-            this.scene.debugLayer.show({ overlay: true });
+            // Use Inspector.Show with proper configuration to ensure left panel is visible
+            Inspector.Show(this.scene, {
+                embedMode: true,
+                handleResize: true,
+            });
         } else {
             this.scene.debugLayer.hide();
         }
     }
 
+    /**
+     * Starts the render loop and enables debugging.
+     * This method should be called after initialization to begin the game.
+     */
     run() {
-        this.debug(true);
+        console.log('Running AppOne...');
+        // Ensure the canvas has focus before enabling debug
+        this.canvas.focus();
+        // Add a small delay to ensure the scene is fully ready before showing inspector
+        setTimeout(() => {
+            this.debug(true);
+        }, 100);
+        
         this.engine.runRenderLoop(() => {
             this.scene.render();
         });
     }
 
+    /**
+     * Creates and configures a new Babylon.js scene.
+     * Sets up basic scene properties and lighting.
+     * 
+     * @param engine - The Babylon.js engine instance
+     * @returns The newly created scene
+     */
     createScene = function (engine: Engine) {
         const scene = new Scene(engine)
         scene.clearColor = new Color4(0, 0, 0, 1)
@@ -114,50 +158,59 @@ export class AppOne {
         return scene
     }
 
+    /**
+     * Loads all 3D models and registers them with the PlanetTransition system.
+     * Associates meshes with specific biomes and positions them on the planet.
+     * 
+     * @param scene - The current Babylon.js scene
+     * @param planet - The planet mesh where objects will be placed
+     * @returns A promise that resolves when all meshes are loaded
+     */
     private async loadMeshes(scene: Scene, planet: Mesh): Promise<void> {
         // First load all tree models
-        await MeshLoader.loadModels(scene);
-        
-        PlanetTransition.registerMaterialMainLandmark(0, MeshLoader.getMesh("house") as Mesh, 34)
-        PlanetTransition
-            .registerMaterialMeshAssociation(0, MeshLoader.getMesh("tree1") as Mesh, 3, 12)
-        PlanetTransition
-            .registerMaterialMeshAssociation(0, MeshLoader.getMesh("bigTree") as Mesh, 1, -1.6)
-        PlanetTransition
-            .registerMaterialMeshAssociation(0, MeshLoader.getMesh("treeSimple") as Mesh, 1, 600)
-        PlanetTransition
-            .registerMaterialMeshAssociation(0, MeshLoader.getMesh("grass") as Mesh, 50, 261)
-
-        PlanetTransition.registerMaterialMainLandmark(1, MeshLoader.getMesh("arch") as Mesh, 20)
-        PlanetTransition
-            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("largeBuilding") as Mesh, 7, 0)
-        PlanetTransition
-            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("largeBuilding2") as Mesh, 7, 0)
-        PlanetTransition
-            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("skyscraper") as Mesh, 1, 6)
-        PlanetTransition
-            .registerMaterialMeshAssociation(1, MeshLoader.getMesh("statue") as Mesh, 10, 1.2)
-
-        PlanetTransition.registerMaterialMainLandmark(2, MeshLoader.getMesh("books") as Mesh, 0.8)
-        PlanetTransition
-            .registerMaterialMeshAssociation(2, MeshLoader.getMesh("townHouse") as Mesh, 3, 9)
-        PlanetTransition
-            .registerMaterialMeshAssociation(2, MeshLoader.getMesh("chimney") as Mesh, 1, 1450)
-        PlanetTransition
-            .registerMaterialMeshAssociation(2, MeshLoader.getMesh("buildingRed") as Mesh, 2, 2.5)
-
-        PlanetTransition.registerMaterialMainLandmark(3, MeshLoader.getMesh("volcano") as Mesh, -1.9)
-        PlanetTransition
-            .registerMaterialMeshAssociation(3, MeshLoader.getMesh("mount") as Mesh, 1, 6.6)
-        PlanetTransition
-            .registerMaterialMeshAssociation(3, MeshLoader.getMesh("brad") as Mesh, 150, -1)
-        PlanetTransition
-            .registerMaterialMeshAssociation(3, MeshLoader.getMesh("seagull") as Mesh, 1, 220)
-        
-        // Spawn all objects after loading
-        PlanetTransition.imediatelySpawnAll(this.scene);
+        await MeshLoader.loadModels(scene).then(() => {
+            PlanetTransition.registerMaterialMainLandmark(0, MeshLoader.getMesh("house") as Mesh, 34)
+            // PlanetTransition
+            //     .registerMaterialMeshAssociation(0, MeshLoader.getMesh("tree1") as Mesh, 3, 12)
+            // PlanetTransition
+            //     .registerMaterialMeshAssociation(0, MeshLoader.getMesh("bigTree") as Mesh, 1, -1.6)
+            // PlanetTransition
+            //     .registerMaterialMeshAssociation(0, MeshLoader.getMesh("treeSimple") as Mesh, 1, 600)
+            // PlanetTransition
+            //     .registerMaterialMeshAssociation(0, MeshLoader.getMesh("grass") as Mesh, 50, 261)
+    
+            PlanetTransition.registerMaterialMainLandmark(1, MeshLoader.getMesh("arch") as Mesh, 20)
+            PlanetTransition
+                .registerMaterialMeshAssociation(1, MeshLoader.getMesh("largeBuilding") as Mesh, 7, 0)
+            PlanetTransition
+                .registerMaterialMeshAssociation(1, MeshLoader.getMesh("largeBuilding2") as Mesh, 7, 0)
+            PlanetTransition
+                .registerMaterialMeshAssociation(1, MeshLoader.getMesh("skyscraper") as Mesh, 1, 6)
+            PlanetTransition
+                .registerMaterialMeshAssociation(1, MeshLoader.getMesh("statue") as Mesh, 10, 1.2)
+    
+            PlanetTransition.registerMaterialMainLandmark(2, MeshLoader.getMesh("books") as Mesh, 0.8)
+            PlanetTransition
+                .registerMaterialMeshAssociation(2, MeshLoader.getMesh("townHouse") as Mesh, 3, 9)
+            PlanetTransition
+                .registerMaterialMeshAssociation(2, MeshLoader.getMesh("chimney") as Mesh, 1, 1450)
+            PlanetTransition
+                .registerMaterialMeshAssociation(2, MeshLoader.getMesh("buildingRed") as Mesh, 2, 2.5)
+    
+            PlanetTransition.registerMaterialMainLandmark(3, MeshLoader.getMesh("volcano") as Mesh, -1.9)
+            PlanetTransition
+                .registerMaterialMeshAssociation(3, MeshLoader.getMesh("mount") as Mesh, 1, 6.6)
+            PlanetTransition
+                .registerMaterialMeshAssociation(3, MeshLoader.getMesh("brad") as Mesh, 150, -1)
+            PlanetTransition
+                .registerMaterialMeshAssociation(3, MeshLoader.getMesh("seagull") as Mesh, 1, 220)
+        });
     }
 
+    /**
+     * Creates the planet and sets up the visual environment.
+     * Configures materials, lighting, and atmospheric effects to create a retro neon aesthetic.
+     */
     createEnvironment(): void {
         const scene = this.scene
         // Create planet
@@ -194,6 +247,11 @@ export class AppOne {
         scene.fogDensity = 0.002; // Slightly denser fog for more atmosphere
     }
 
+    /**
+     * Configures the follow camera to track the player.
+     * Sets up camera parameters and adds a render observable to maintain proper orientation
+     * relative to the planet's surface and player's heading.
+     */
     setupCamera(): void {
         this.camera = new FollowCamera("camera", new Vector3(-Math.PI/2, Math.PI/4, 6), this.scene);        
         const player = this.scene.getMeshByName("player") as Mesh;
