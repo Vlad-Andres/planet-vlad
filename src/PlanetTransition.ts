@@ -17,7 +17,7 @@ export class PlanetTransition {
     public static facesProcessedBefore: number[] = []
     public static sphere: Mesh
     public static debug: boolean = false
-    private static startWithMaterial: number = 1
+    private static startWithMaterial: number = 3
 
     constructor(sphere: Mesh, debug: boolean) {
         PlanetTransition.sphere = sphere;

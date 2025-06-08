@@ -67,7 +67,6 @@ export class PlayerMovement {
         if (currentTime - this.lastActionTime < this.ACTION_DELAY) {
             return; // Skip if not enough time has passed
         }
-        console.log('running')
         this.lastActionTime = currentTime;
         PlanetTransition.do(scene)
     }
@@ -90,12 +89,11 @@ export class PlayerMovement {
 
         // Get current biome index
         const currentBiomeIndex = BiomeManager.getCurrentBiomeIndex();
-        console.log(currentBiomeIndex)
         // Get the base threshold for the current biome
         const baseThreshold = this.BIOME_THRESHOLDS[this.currentBiomIndex] || 15;
         
         const distance = Vector3.Distance(this.player.position, instancePosition);
-        console.log(`Distance to landmark: ${distance}, Threshold: ${baseThreshold}`);
+        // console.log(`Distance to landmark: ${distance}, Threshold: ${baseThreshold}`);
         
         // tODO: Problem here
         

@@ -191,7 +191,6 @@ export class MeshLoader {
                 this.loadBuildingModels(scene),
                 this.loadEnvironmentModels(scene)
             ]);
-            console.log("All models loaded successfully");
         } catch (error) {
             console.error("Error loading models:", error);
         }

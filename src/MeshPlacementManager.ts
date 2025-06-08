@@ -4,7 +4,9 @@ import {
     Mesh,
     Matrix,
     InstancedMesh,
-    Material
+    Material,
+    VertexBuffer,
+    VertexData
 } from '@babylonjs/core'
 import { Materials } from './Materials';
 
@@ -31,6 +33,7 @@ export class MeshPlacementManager {
     private static oldLandmark: Mesh | undefined = undefined;
     private static sphere: Mesh;
     private static scene: Scene;
+    private static usedPositionIndices: Set<number> = new Set();
     
     constructor(sphere: Mesh) {
         MeshPlacementManager.sphere = sphere;
@@ -81,43 +84,29 @@ export class MeshPlacementManager {
         association: MaterialMeshAssociation,
         positions: Vector3[],
     ): void {
-        // Maximum number of attempts to find a valid position
-        const MAX_ATTEMPTS = 100;
-        let attempts = 0;
-        let positionData;
-        
         // Get player position from the scene
         const player = this.scene.getMeshByName('player') as Mesh;
         const playerPosition = player ? player.position : null;
         const MIN_PLAYER_DISTANCE = 10; // Minimum distance from player
         
-        // Keep trying to find a valid position until we succeed or run out of attempts
+        let positionData;
+        let attempts = 0;
+        const MAX_ATTEMPTS = 50;
+        
         do {
-            positionData = this.getRandomPosition(positions, association.verticalOffset, 16);
+            positionData = this.getRandomPositionFarFromUsed(positions, association.verticalOffset, 16);
             attempts++;
-            
-            // If we've tried too many times, reduce the spacing requirements gradually
-            let currentSpacing = 16;
-            if (attempts > MAX_ATTEMPTS * 0.3) {
-                currentSpacing = 12;
-            } else if (attempts > MAX_ATTEMPTS * 0.6) {
-                currentSpacing = 8;
-            } else if (attempts > MAX_ATTEMPTS * 0.8) {
-                currentSpacing = 4;
-            }
-            
-            if (attempts > MAX_ATTEMPTS / 2) {
-                positionData = this.getRandomPosition(positions, association.verticalOffset, currentSpacing);
-            }
-        } while ((
-            this.isPositionTooClose(positionData.liftedPosition, 16) ||
-            (playerPosition && Vector3.Distance(positionData.liftedPosition, playerPosition) < MIN_PLAYER_DISTANCE)
-        ) && attempts < MAX_ATTEMPTS);
+        } while (
+            playerPosition && 
+            Vector3.Distance(positionData.liftedPosition, playerPosition) < MIN_PLAYER_DISTANCE &&
+            attempts < MAX_ATTEMPTS
+        );
         
         const scale = 1;
         const transitionMatrix = this.createTransformationMatrix(positionData, scale);
         
         const meshTemplate = association.meshTemplate!;
+        this.conformMeshToSphere(meshTemplate, this.sphere)
         meshTemplate.setEnabled(true);
         this.busyPositions.set(positionData.liftedPosition, meshTemplate.thinInstanceAdd(transitionMatrix));
         this.oldLandmark = meshTemplate;
@@ -130,52 +119,90 @@ export class MeshPlacementManager {
         positions: Vector3[],
     ): void {
         let i = 0;
-        const MAX_ATTEMPTS_PER_INSTANCE = 50;
         
         while(i < association.density) {            
-            let attempts = 0;
-            let positionData;
-            let validPositionFound = false;
+            const positionData = this.getRandomPositionFarFromUsed(positions, association.verticalOffset);
             
-            // Keep trying to find a valid position that's not too close to existing instances
-            do {
-                positionData = this.getRandomPosition(positions, association.verticalOffset);
-                attempts++;
-                
-                // Check if this position is too close to existing instances
-                if (!this.isPositionTooClose(positionData.liftedPosition, this.INSTANCE_FREE_RADIUS)) {
-                    validPositionFound = true;
-                } else if (attempts > MAX_ATTEMPTS_PER_INSTANCE * 0.7) {
-                    // If we're struggling to find a position, reduce the minimum distance requirement
-                    if (!this.isPositionTooClose(positionData.liftedPosition, this.INSTANCE_FREE_RADIUS * 0.5)) {
-                        validPositionFound = true;
-                    }
-                }
-                
-            } while (!validPositionFound && attempts < MAX_ATTEMPTS_PER_INSTANCE);
+            const scale = 1;
+            const transitionMatrix = this.createTransformationMatrix(positionData, scale);
+            this.busyPositions.set(positionData.liftedPosition, association.meshTemplate!.thinInstanceAdd(transitionMatrix));
             
-            if (validPositionFound) {
-                const scale = 1;
-                const transitionMatrix = this.createTransformationMatrix(positionData!, scale);
-                this.busyPositions.set(positionData!.liftedPosition, association.meshTemplate!.thinInstanceAdd(transitionMatrix));
-                i++; // Only increment if we successfully placed an instance
-            } else {
-                console.warn('Could not find valid position for instance after ' + MAX_ATTEMPTS_PER_INSTANCE + ' attempts. Skipping this instance.');
-                i++; // Still increment to avoid infinite loop, but log the issue
-            }
+            i++;
         }
     }
     
     /**
-     * Check if a given position is too close to any existing instances
-     * @param position The position to check
-     * @param minDistance The minimum allowed distance
-     * @returns true if the position is too close to existing instances
+     * Get a random position that's far from previously used positions
+     * @param positions Available positions array
+     * @param verticalOffset Vertical offset for lifting the position
+     * @param minDistanceBetweenPositions Minimum distance between position indices (default based on INSTANCE_FREE_RADIUS)
+     * @returns RandomPositionData for the selected position
      */
-    private static isPositionTooClose(position: Vector3, minDistance: number): boolean {
-        for (const busyPosition of this.busyPositions.keys()) {
-            const distance = Vector3.Distance(position, busyPosition);
-            if (distance < minDistance) {
+    public static getRandomPositionFarFromUsed(
+        positions: Vector3[], 
+        verticalOffset: number, 
+        minDistanceBetweenPositions?: number
+    ): RandomPositionData {
+        // Calculate minimum index distance based on sphere size and desired physical distance
+        const sphereRadius = this.sphere.scaling.x * 4;
+        const desiredPhysicalDistance = minDistanceBetweenPositions || this.INSTANCE_FREE_RADIUS;
+        
+        // Estimate how many positions apart we need based on sphere circumference
+        const sphereCircumference = 2 * Math.PI * sphereRadius;
+        const minIndexDistance = Math.max(1, Math.floor((desiredPhysicalDistance / sphereCircumference) * positions.length));
+        
+        let randomIndex: number;
+        let attempts = 0;
+        const MAX_ATTEMPTS = 100;
+        
+        do {
+            randomIndex = Math.floor(Math.random() * positions.length);
+            attempts++;
+            
+            // If we've tried many times and still can't find a good position, 
+            // just use any position (fallback to prevent infinite loop)
+            if (attempts > MAX_ATTEMPTS) {
+                break;
+            }
+        } while (this.isIndexTooCloseToUsed(randomIndex, minIndexDistance) && attempts < MAX_ATTEMPTS);
+        
+        // Mark this index as used
+        this.usedPositionIndices.add(randomIndex);
+        
+        const randomPosition = positions[randomIndex];
+        const positionNormal = randomPosition.normalize();
+        const rotationMatrix = Matrix.Identity();
+        const up = Vector3.Up();
+        const angle = Math.acos(Vector3.Dot(up, positionNormal));
+        const axis = Vector3.Cross(up, positionNormal).normalize();
+        
+        if (angle !== 0) {
+            Matrix.RotationAxisToRef(axis, angle, rotationMatrix);
+        }
+    
+        const surfaceOffset = verticalOffset;
+        const liftedPosition = randomPosition.add(positionNormal.scale(surfaceOffset));
+    
+        return {
+            position: randomPosition,
+            liftedPosition,
+            rotationMatrix,
+        };
+    }
+    
+    /**
+     * Check if a position index is too close to any previously used indices
+     * @param index The index to check
+     * @param minDistance Minimum distance between indices
+     * @returns true if the index is too close to used ones
+     */
+    private static isIndexTooCloseToUsed(index: number, minDistance: number): boolean {
+        for (const usedIndex of this.usedPositionIndices) {
+            // Check both direct distance and wraparound distance (since it's a sphere)
+            const directDistance = Math.abs(index - usedIndex);
+            const wraparoundDistance = Math.min(directDistance, this.usedPositionIndices.size - directDistance);
+            
+            if (wraparoundDistance < minDistance) {
                 return true;
             }
         }
@@ -259,6 +286,7 @@ export class MeshPlacementManager {
         }
         
         this.busyPositions.clear();
+        this.usedPositionIndices.clear(); // Clear used position indices
         
         if (this.oldLandmark) {
             this.oldLandmark.thinInstanceCount = 0;
@@ -285,20 +313,19 @@ export class MeshPlacementManager {
             
             if (association.isLandmark && association.meshTemplate) {
                 needsLandmark = true;
-                totalPositionsNeeded += 1; // Only need one position for the landmark
+                totalPositionsNeeded += 1;
             } else if (association.density > 0 && association.meshTemplate) {
-                // Add positions for regular meshes based on density
-                // Increase the buffer significantly to account for positions that might be too close
-                totalPositionsNeeded += association.density * 5; // More buffer for better position selection
+                totalPositionsNeeded += association.density;
             }
         }
         
-        // Ensure we have at least a minimum number of positions to choose from
-        const MIN_POSITIONS = 100; // Increased minimum to give more position options
-        totalPositionsNeeded = Math.max(totalPositionsNeeded, MIN_POSITIONS);
+        // Generate more positions than needed to ensure good distribution
+        // The spacing algorithm works better with more positions to choose from
+        const MIN_POSITIONS = Math.max(totalPositionsNeeded * 8, 200);
+        const randomPositions = this.generateRandomPositionsOnSphere(this.sphere, MIN_POSITIONS);
         
-        // Generate only the positions we need
-        const randomPositions = this.generateRandomPositionsOnSphere(this.sphere, totalPositionsNeeded);
+        // Clear used position indices for this new placement session
+        this.usedPositionIndices.clear();
         
         // Reset all mesh templates to their initial state for this material
         this.materialAssociations.forEach(association => {
@@ -338,6 +365,7 @@ export class MeshPlacementManager {
         
         this.materialAssociations = [];
         this.busyPositions.clear();
+        this.usedPositionIndices.clear(); // Clear used position indices
         this.oldLandmark = undefined;
         this.currentLandmark = undefined;
     }
@@ -351,5 +379,54 @@ export class MeshPlacementManager {
                 positionData.liftedPosition.y,
                 positionData.liftedPosition.z
             ));
+    }
+
+    private static conformMeshToSphere(mesh: Mesh, sphere: Mesh): void {
+        const sphereRadius = sphere.scaling.x * 4; // Assuming your sphere radius
+        const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+        
+        if (positions) {
+            // Get the mesh's world matrix to transform vertices to world space
+            const worldMatrix = mesh.getWorldMatrix();
+            let changedVertices = 0;
+            for (let i = 0; i < positions.length; i += 3) {
+                // Get vertex position
+                let vertex = new Vector3(positions[i], positions[i + 1], positions[i + 2]);
+                
+                // Transform to world space
+                vertex = Vector3.TransformCoordinates(vertex, worldMatrix);
+                
+                // Calculate distance from sphere center
+                const distanceFromCenter = vertex.length();
+                
+                // Only deform vertices that are close to the sphere surface
+                // This preserves the mesh's general shape while conforming the base
+                if (distanceFromCenter < sphereRadius + 2) { // Adjust threshold as needed
+                    // Project vertex onto sphere surface
+                    const normalizedVertex = vertex.normalize();
+                    const projectedVertex = normalizedVertex.scale(sphereRadius);
+                    changedVertices++;
+                    // Transform back to local space
+                    const inverseWorldMatrix = worldMatrix.clone().invert();
+                    const localVertex = Vector3.TransformCoordinates(projectedVertex, inverseWorldMatrix);
+                    
+                    positions[i] = localVertex.x;
+                    positions[i + 1] = localVertex.y;
+                    positions[i + 2] = localVertex.z;
+                }
+            }
+
+            console.log('Changed vertices:'+ changedVertices)
+            
+            // Update the mesh with new positions
+            mesh.updateVerticesData(VertexBuffer.PositionKind, positions);
+            
+            // Recalculate normals for proper lighting
+            const indices = mesh.getIndices();
+            if (indices) {
+                VertexData.ComputeNormals(positions, indices, mesh.getVerticesData(VertexBuffer.NormalKind));
+                mesh.updateVerticesData(VertexBuffer.NormalKind, mesh.getVerticesData(VertexBuffer.NormalKind)!);
+            }
+        }
     }
 }
