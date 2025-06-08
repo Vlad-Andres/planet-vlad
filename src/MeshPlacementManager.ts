@@ -132,13 +132,7 @@ export class MeshPlacementManager {
         let i = 0;
         const MAX_ATTEMPTS_PER_INSTANCE = 50;
         
-        console.log('--------------------------------')
-        console.log('Association density: ' + association.density)
-        console.log('Association meshTemplate: ' + association.meshTemplate)
-        
-        while(i < association.density) {
-            console.log('Adding thin instances for association! Instance: ' + (i + 1) + '/' + association.density);
-            
+        while(i < association.density) {            
             let attempts = 0;
             let positionData;
             let validPositionFound = false;
@@ -192,7 +186,6 @@ export class MeshPlacementManager {
         association: MaterialMeshAssociation,
         positions: Vector3[],
     ): void {
-        console.log('Adding thin instances for association!');
         this.addThinInstancesForAssociation(association, positions);
     }
     
