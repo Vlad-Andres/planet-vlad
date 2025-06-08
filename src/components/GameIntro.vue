@@ -147,6 +147,8 @@ export default {
     };
     
     onMounted(() => {
+      // TODO: remove afterwards:
+      // startGame();
       // Setup scroll listener to show/hide overlay based on scroll position
       window.addEventListener('scroll', () => {
         const scrollPosition = window.scrollY;

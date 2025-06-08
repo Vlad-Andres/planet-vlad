@@ -50,7 +50,7 @@ export class BiomeManager {
     private static initialized: boolean = false;
     private static horizonBlurEffect: PostProcess | null = null;
     private static lastBiomeChangeTime: number = 0;
-    private static cooldownPeriod: number = 2000; // 20 seconds in milliseconds
+    private static cooldownPeriod: number = 4000; // 20 seconds in milliseconds
     private static cooldownMessage: TextBlock | null = null;
     private static cooldownUI: AdvancedDynamicTexture | null = null;
 
@@ -83,32 +83,32 @@ export class BiomeManager {
                 });
             }
             
-            // Add a render observer to update effect parameters each frame with improved error handling
-            scene.onBeforeRenderObservable.add(() => {
-                if (!this.horizonBlurEffect || !this.horizonBlurEffect.getEffect()) return;
+            // // Add a render observer to update effect parameters each frame with improved error handling TODO: find out if necessary
+            // scene.onBeforeRenderObservable.add(() => {
+            //     if (!this.horizonBlurEffect || !this.horizonBlurEffect.getEffect()) return;
 
-                const planet = scene.getMeshByName("planet");
-                if (!planet || !scene.activeCamera) return;
+            //     const planet = scene.getMeshByName("planet");
+            //     if (!planet || !scene.activeCamera) return;
 
-                try {
-                    const worldMatrix = planet.getWorldMatrix();
-                    const viewProjection = scene.getTransformMatrix();
-                    const worldViewProjection = worldMatrix.multiply(viewProjection);
+            //     try {
+            //         const worldMatrix = planet.getWorldMatrix();
+            //         const viewProjection = scene.getTransformMatrix();
+            //         const worldViewProjection = worldMatrix.multiply(viewProjection);
                     
-                    const effect = this.horizonBlurEffect.getEffect();
-                    if (!effect || !effect.setMatrix || !effect.setVector3 || !effect.setFloat) return;
+            //         const effect = this.horizonBlurEffect.getEffect();
+            //         if (!effect || !effect.setMatrix || !effect.setVector3 || !effect.setFloat) return;
 
-                    effect.setMatrix("worldViewProjection", worldViewProjection);
-                    effect.setVector3("planetCenter", planet.position);
+            //         effect.setMatrix("worldViewProjection", worldViewProjection);
+            //         effect.setVector3("planetCenter", planet.position);
                     
-                    // Update radius parameter for dynamic effect
-                    const distanceToCamera = Vector3.Distance(planet.position, scene.activeCamera.position);
-                    const dynamicRadius = Math.max(1.0, Math.min(3.0, distanceToCamera / 10));
-                    effect.setFloat("radius", dynamicRadius);
-                } catch (error) {
-                    console.warn("Error updating horizon blur effect:", error);
-                }
-            });
+            //         // Update radius parameter for dynamic effect
+            //         const distanceToCamera = Vector3.Distance(planet.position, scene.activeCamera.position);
+            //         const dynamicRadius = Math.max(1.0, Math.min(3.0, distanceToCamera / 10));
+            //         effect.setFloat("radius", dynamicRadius);
+            //     } catch (error) {
+            //         console.warn("Error updating horizon blur effect:", error);
+            //     }
+            // });
 
         } else {
             console.warn("No active camera found. Horizon effect will not be applied.");
@@ -129,6 +129,9 @@ export class BiomeManager {
         this.initialized = true;
     }
 
+    /**
+     * contains biomes content and descriptions
+     */
     private static setupBiomes(): void {
         // Define biomes in the order: grass → brick → stone → repeat
         this.biomes = [

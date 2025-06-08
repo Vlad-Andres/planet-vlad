@@ -19,6 +19,7 @@ import {
 } from '@babylonjs/core'
 import { Materials } from './Materials';
 import { FurMaterial } from '@babylonjs/materials';
+import { MeshPlacementManager } from './MeshPlacementManager';
 
 interface MaterialMeshAssociation {
     materialIndex: number
@@ -26,6 +27,7 @@ interface MaterialMeshAssociation {
     instances: InstancedMesh[]
     density: number
     verticalOffset: number
+    isLandmark: boolean
 }
 
 interface RandomPositionData {
@@ -47,6 +49,7 @@ export class PlanetTransition {
     private static INSTANCE_FREE_RADIUS = 5
     private static oldLandmark: Mesh | undefined = undefined
     private static currentLandmark: Mesh | undefined = undefined
+    private static startWithMaterial: number = 1
 
     public static getCurrentLandmark(): Mesh | undefined {
         return this.currentLandmark;
@@ -54,18 +57,19 @@ export class PlanetTransition {
 
     constructor(sphere: Mesh, debug: boolean) {
         // Apply the active material directly to the sphere
-        sphere.material = Materials.getActiveMaterial();
+        // sphere.material = Materials.getActiveMaterial();
         
-        // Force material to refresh by marking it as dirty
-        if (sphere.material) {
-            sphere.material.markAsDirty(Material.AllDirtyFlag);
-        }
+        // // Force material to refresh by marking it as dirty
+        // if (sphere.material) {
+        //     sphere.material.markAsDirty(Material.AllDirtyFlag);
+        // }
         
         // We'll let the Materials class handle the fur material creation
         // through its materialCallback system instead of creating it here
         
         PlanetTransition.sphere = sphere;
         PlanetTransition.debug = debug;
+        new MeshPlacementManager(sphere);
     }
 
     public static registerMaterialMeshAssociation(
@@ -79,7 +83,8 @@ export class PlanetTransition {
             meshTemplate,
             instances: [],
             density,
-            verticalOffset
+            verticalOffset,
+            isLandmark: false
         });
     }
 
@@ -94,7 +99,8 @@ export class PlanetTransition {
             meshTemplate,
             instances: [],
             density,
-            verticalOffset
+            verticalOffset,
+            isLandmark: true
         })
     }
 
@@ -118,10 +124,6 @@ export class PlanetTransition {
             positionData = this.getRandomPosition(positions, association.verticalOffset, 16);
             attempts++;
             
-            // Check if position is too close to player
-            const isTooCloseToPlayer = playerPosition && 
-                Vector3.Distance(positionData.liftedPosition, playerPosition) < MIN_PLAYER_DISTANCE;
-            
             // If we've tried too many times, adjust the spacing requirements
             if (attempts > MAX_ATTEMPTS / 2) {
                 positionData = this.getRandomPosition(positions, association.verticalOffset, 8); // Try with smaller spacing
@@ -142,15 +144,13 @@ export class PlanetTransition {
                 positionData.liftedPosition.y,
                 positionData.liftedPosition.z
             ));
-    
-        const meshTemplate = association.meshTemplate;
-        if (meshTemplate) {
-            meshTemplate.setEnabled(true);
-            this.busyPositions.set(positionData.liftedPosition, meshTemplate.thinInstanceAdd(transitionMatrix));
-            this.oldLandmark = meshTemplate;
-            this.currentLandmark = meshTemplate;
-            association.meshTemplate = null;
-        }
+        
+        const meshTemplate = association.meshTemplate!;
+        meshTemplate.setEnabled(true);
+        this.busyPositions.set(positionData.liftedPosition, meshTemplate.thinInstanceAdd(transitionMatrix));
+        this.oldLandmark = meshTemplate;
+        this.currentLandmark = meshTemplate;
+        association.meshTemplate = null;
     }
 
     private static generateRandomPositionsOnSphere(sphere: Mesh, count: number): Vector3[] {
@@ -239,7 +239,7 @@ export class PlanetTransition {
         positions: Vector3[],
     ): void {
         let i = 0
-        while(i< association.density) {
+        while(i < association.density) {
             const positionData = this.getRandomPosition(positions, association.verticalOffset)
 
             if (positionData.isTooClose) {
@@ -266,9 +266,8 @@ export class PlanetTransition {
         association: MaterialMeshAssociation,
         positions: Vector3[],
     ): void {
-        for (let i = 0; i < 20; i++) { // Increased from 10 to 20 iterations
+        console.log('Adding thin instances for association !');
             this.addThinInstancesForAssociation(association, positions);
-        }
     }
 
     public static do(scene: Scene): void {
@@ -284,6 +283,7 @@ export class PlanetTransition {
         // Update the material index to the next biome
         Materials.changeActiveMaterial();
         sphere.material = Materials.getActiveMaterial();
+        sphere.material.wireframe = true;
         
         // Generate random positions on the sphere surface for placing meshes
         const randomPositions = this.generateRandomPositionsOnSphere(sphere, 100); // Increased from 50 to 100 positions
@@ -301,18 +301,18 @@ export class PlanetTransition {
         
         // First pass: Add landmarks for the new biome
         for (const association of this.materialAssociations) {
-            if (association.materialIndex !== nextMaterialIndex) {
+            if (association.materialIndex !== nextMaterialIndex || !association.isLandmark) {
                 continue;
             }
             
-            if (association.density === 0 && association.meshTemplate != null) {
+            if (association.meshTemplate != null) {
                 this.addMainLandmark(association, randomPositions);
             }
         }
         
         // Second pass: Add other meshes for the new biome
         for (const association of this.materialAssociations) {
-            if (association.materialIndex !== nextMaterialIndex) {
+            if (association.materialIndex !== nextMaterialIndex || association.isLandmark) {
                 continue;
             }
             
@@ -331,14 +331,15 @@ export class PlanetTransition {
         console.log('Initial biome setup')
         const sphere = scene.getMeshByName('planet') as Mesh;
         this.sphere = sphere; // Ensure sphere is set
-
+        const materialIndex = this.startWithMaterial;
         // Set material index to 0 (grass biome) before spawning
         // This ensures we start with the grass biome (index 0 in BiomeManager)
-        Materials.changeActiveMaterial(0);
+        Materials.changeActiveMaterial(materialIndex);
         
         // Apply the initial material directly and ensure it's properly refreshed
         const material = Materials.getActiveMaterial();
         sphere.material = material;
+        sphere.material.wireframe = true;
         
         // Force material to refresh by marking it as dirty
         if (sphere.material) {
@@ -359,7 +360,7 @@ export class PlanetTransition {
 
         // First pass: Add landmarks only for the initial biome (index 0)
         for (const association of this.materialAssociations) {
-            if (association.materialIndex !== 0) {
+            if (association.materialIndex !== materialIndex) {
                 continue;
             }
             
@@ -370,7 +371,7 @@ export class PlanetTransition {
 
         // Second pass: Add other meshes for the initial biome
         for (const association of this.materialAssociations) {
-            if (association.materialIndex !== 0) {
+            if (association.materialIndex !== materialIndex) {
                 continue;
             }
             
@@ -438,8 +439,6 @@ export class PlanetTransition {
             this.busyPositions.clear();
         }
     }
-    
-    
 
     public static dispose(): void {
 

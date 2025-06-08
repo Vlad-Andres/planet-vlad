@@ -98,7 +98,7 @@ constructor(readonly canvas: HTMLCanvasElement) {
         }
         
         // Load all meshes before starting the game
-        await this.loadMeshes(this.scene, this.planet)
+        await this.registerMeshes(this.scene, this.planet)
         .then(() => {
             BiomeManager.initialize(this.scene);
             // Spawn all objects after loading
@@ -166,7 +166,7 @@ constructor(readonly canvas: HTMLCanvasElement) {
      * @param planet - The planet mesh where objects will be placed
      * @returns A promise that resolves when all meshes are loaded
      */
-    private async loadMeshes(scene: Scene, planet: Mesh): Promise<void> {
+    private async registerMeshes(scene: Scene, planet: Mesh): Promise<void> {
         // First load all tree models
         await MeshLoader.loadModels(scene).then(() => {
             PlanetTransition.registerMaterialMainLandmark(0, MeshLoader.getMesh("house") as Mesh, 34)
@@ -179,15 +179,15 @@ constructor(readonly canvas: HTMLCanvasElement) {
             PlanetTransition
                 .registerMaterialMeshAssociation(0, MeshLoader.getMesh("grass") as Mesh, 50, 261)
     
-            PlanetTransition.registerMaterialMainLandmark(1, MeshLoader.getMesh("arch") as Mesh, 20)
+            PlanetTransition.registerMaterialMainLandmark(1, MeshLoader.getMesh("arch") as Mesh, 24)
             PlanetTransition
-                .registerMaterialMeshAssociation(1, MeshLoader.getMesh("largeBuilding") as Mesh, 7, 0)
+                .registerMaterialMeshAssociation(1, MeshLoader.getMesh("largeBuilding") as Mesh, 7, 3)
             PlanetTransition
-                .registerMaterialMeshAssociation(1, MeshLoader.getMesh("largeBuilding2") as Mesh, 7, 0)
+                .registerMaterialMeshAssociation(1, MeshLoader.getMesh("largeBuilding2") as Mesh, 7, 3)
             PlanetTransition
-                .registerMaterialMeshAssociation(1, MeshLoader.getMesh("skyscraper") as Mesh, 1, 6)
+                .registerMaterialMeshAssociation(1, MeshLoader.getMesh("skyscraper") as Mesh, 1, 9)
             PlanetTransition
-                .registerMaterialMeshAssociation(1, MeshLoader.getMesh("statue") as Mesh, 10, 1.2)
+                .registerMaterialMeshAssociation(1, MeshLoader.getMesh("statue") as Mesh, 10, 2)
     
             PlanetTransition.registerMaterialMainLandmark(2, MeshLoader.getMesh("books") as Mesh, 0.8)
             PlanetTransition
