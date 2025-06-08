@@ -101,7 +101,10 @@ export class MeshPlacementManager {
             if (attempts > MAX_ATTEMPTS / 2) {
                 positionData = this.getRandomPosition(positions, association.verticalOffset, 8); // Try with smaller spacing
             }
-        } while ((positionData.isTooClose || (playerPosition && Vector3.Distance(positionData.liftedPosition, playerPosition) < MIN_PLAYER_DISTANCE)) && attempts < MAX_ATTEMPTS);
+        } while (( // Check if position is too close to existing instances or player
+            positionData.isTooClose ||
+            (playerPosition && Vector3.Distance(positionData.liftedPosition, playerPosition) < MIN_PLAYER_DISTANCE)
+        ) && attempts < MAX_ATTEMPTS);
         
         // If we still couldn't find a position, force placement at the last attempted position
         if (positionData.isTooClose) {
@@ -245,14 +248,38 @@ export class MeshPlacementManager {
         }
     }
     
-    public static placeMeshesForMaterial(materialIndex: number, count: number = 100): void {
+    public static placeMeshesForMaterial(materialIndex: number): void {
         if (!this.sphere) {
             console.error("MeshPlacementManager not initialized with a sphere.");
             return;
         }
         
-        // Generate random positions on the sphere surface for placing meshes
-        const randomPositions = this.generateRandomPositionsOnSphere(this.sphere, count);
+        // Calculate how many positions we actually need based on material associations
+        let totalPositionsNeeded = 0;
+        let needsLandmark = false;
+        
+        // Count how many positions we need based on density
+        for (const association of this.materialAssociations) {
+            if (association.materialIndex !== materialIndex) {
+                continue;
+            }
+            
+            if (association.isLandmark && association.meshTemplate) {
+                needsLandmark = true;
+                totalPositionsNeeded += 1; // Only need one position for the landmark
+            } else if (association.density > 0 && association.meshTemplate) {
+                // Add positions for regular meshes based on density
+                // Add a small buffer (2x) to account for positions that might be too close
+                totalPositionsNeeded += association.density * 2;
+            }
+        }
+        
+        // Ensure we have at least a minimum number of positions to choose from
+        const MIN_POSITIONS = 20;
+        totalPositionsNeeded = Math.max(totalPositionsNeeded, MIN_POSITIONS);
+        
+        // Generate only the positions we need
+        const randomPositions = this.generateRandomPositionsOnSphere(this.sphere, totalPositionsNeeded);
         
         // Reset all mesh templates to their initial state for this material
         this.materialAssociations.forEach(association => {
@@ -262,14 +289,16 @@ export class MeshPlacementManager {
             }
         });
         
-        // First pass: Add landmarks for the material
+        // First pass: Add landmarks for the material (ensuring only one is placed)
+        let landmarkPlaced = false;
         for (const association of this.materialAssociations) {
-            if (association.materialIndex !== materialIndex || !association.isLandmark) {
+            if (association.materialIndex !== materialIndex || !association.isLandmark || landmarkPlaced) {
                 continue;
             }
             
             if (association.meshTemplate != null) {
                 this.addMainLandmark(association, randomPositions);
+                landmarkPlaced = true; // Ensure only one landmark is placed
             }
         }
         
@@ -279,7 +308,7 @@ export class MeshPlacementManager {
                 continue;
             }
             
-            if (association.density !== 0) {
+            if (association.meshTemplate && association.density > 0) {
                 this.addThinInstancesForAssociation(association, randomPositions);
             }
         }
