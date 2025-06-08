@@ -169,19 +169,19 @@ constructor(readonly canvas: HTMLCanvasElement) {
     private async registerMeshes(scene: Scene, planet: Mesh): Promise<void> {
         // First load all tree models
         await MeshLoader.loadModels(scene).then(() => {
-            PlanetTransition.registerMaterialMainLandmark(0, MeshLoader.getMesh("house") as Mesh, 34)
-            PlanetTransition
-                .registerMaterialMeshAssociation(0, MeshLoader.getMesh("tree1") as Mesh, 3, 12)
-            PlanetTransition
-                .registerMaterialMeshAssociation(0, MeshLoader.getMesh("bigTree") as Mesh, 1, -1.6)
-            PlanetTransition
-                .registerMaterialMeshAssociation(0, MeshLoader.getMesh("treeSimple") as Mesh, 1, 600)
-            PlanetTransition
-                .registerMaterialMeshAssociation(0, MeshLoader.getMesh("grass") as Mesh, 50, 261)
+            // PlanetTransition.registerMaterialMainLandmark(0, MeshLoader.getMesh("house") as Mesh, 34)
+            // PlanetTransition
+            //     .registerMaterialMeshAssociation(0, MeshLoader.getMesh("tree1") as Mesh, 3, 12)
+            // PlanetTransition
+            //     .registerMaterialMeshAssociation(0, MeshLoader.getMesh("bigTree") as Mesh, 1, -1.6)
+            // PlanetTransition
+            //     .registerMaterialMeshAssociation(0, MeshLoader.getMesh("treeSimple") as Mesh, 1, 600)
+            // PlanetTransition
+            //     .registerMaterialMeshAssociation(0, MeshLoader.getMesh("grass") as Mesh, 50, 261)
     
             PlanetTransition.registerMaterialMainLandmark(1, MeshLoader.getMesh("arch") as Mesh, 24)
             PlanetTransition
-                .registerMaterialMeshAssociation(1, MeshLoader.getMesh("largeBuilding") as Mesh, 7, 3)
+                .registerMaterialMeshAssociation(1, MeshLoader.getMesh("largeBuilding") as Mesh, 2, 3)
             PlanetTransition
                 .registerMaterialMeshAssociation(1, MeshLoader.getMesh("largeBuilding2") as Mesh, 7, 3)
             PlanetTransition
@@ -189,21 +189,21 @@ constructor(readonly canvas: HTMLCanvasElement) {
             PlanetTransition
                 .registerMaterialMeshAssociation(1, MeshLoader.getMesh("statue") as Mesh, 10, 2)
     
-            PlanetTransition.registerMaterialMainLandmark(2, MeshLoader.getMesh("books") as Mesh, 0.8)
-            PlanetTransition
-                .registerMaterialMeshAssociation(2, MeshLoader.getMesh("townHouse") as Mesh, 3, 9)
-            PlanetTransition
-                .registerMaterialMeshAssociation(2, MeshLoader.getMesh("chimney") as Mesh, 1, 1450)
-            PlanetTransition
-                .registerMaterialMeshAssociation(2, MeshLoader.getMesh("buildingRed") as Mesh, 2, 2.5)
+            // PlanetTransition.registerMaterialMainLandmark(2, MeshLoader.getMesh("books") as Mesh, 0.8)
+            // PlanetTransition
+            //     .registerMaterialMeshAssociation(2, MeshLoader.getMesh("townHouse") as Mesh, 3, 9)
+            // PlanetTransition
+            //     .registerMaterialMeshAssociation(2, MeshLoader.getMesh("chimney") as Mesh, 1, 1450)
+            // PlanetTransition
+            //     .registerMaterialMeshAssociation(2, MeshLoader.getMesh("buildingRed") as Mesh, 2, 2.5)
     
-            PlanetTransition.registerMaterialMainLandmark(3, MeshLoader.getMesh("volcano") as Mesh, -1.9)
-            PlanetTransition
-                .registerMaterialMeshAssociation(3, MeshLoader.getMesh("mount") as Mesh, 1, 6.6)
-            PlanetTransition
-                .registerMaterialMeshAssociation(3, MeshLoader.getMesh("brad") as Mesh, 150, -1)
-            PlanetTransition
-                .registerMaterialMeshAssociation(3, MeshLoader.getMesh("seagull") as Mesh, 1, 220)
+            // PlanetTransition.registerMaterialMainLandmark(3, MeshLoader.getMesh("volcano") as Mesh, -1.9)
+            // PlanetTransition
+            //     .registerMaterialMeshAssociation(3, MeshLoader.getMesh("mount") as Mesh, 1, 6.6)
+            // PlanetTransition
+            //     .registerMaterialMeshAssociation(3, MeshLoader.getMesh("brad") as Mesh, 150, -1)
+            // PlanetTransition
+            //     .registerMaterialMeshAssociation(3, MeshLoader.getMesh("seagull") as Mesh, 1, 220)
         });
     }
 

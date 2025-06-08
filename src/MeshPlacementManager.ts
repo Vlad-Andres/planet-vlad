@@ -21,7 +21,6 @@ export interface RandomPositionData {
     position: Vector3
     liftedPosition: Vector3
     rotationMatrix: Matrix
-    isTooClose: boolean
 }
 
 export class MeshPlacementManager {
@@ -83,7 +82,7 @@ export class MeshPlacementManager {
         positions: Vector3[],
     ): void {
         // Maximum number of attempts to find a valid position
-        const MAX_ATTEMPTS = 50;
+        const MAX_ATTEMPTS = 100;
         let attempts = 0;
         let positionData;
         
@@ -97,29 +96,26 @@ export class MeshPlacementManager {
             positionData = this.getRandomPosition(positions, association.verticalOffset, 16);
             attempts++;
             
-            // If we've tried too many times, adjust the spacing requirements
-            if (attempts > MAX_ATTEMPTS / 2) {
-                positionData = this.getRandomPosition(positions, association.verticalOffset, 8); // Try with smaller spacing
+            // If we've tried too many times, reduce the spacing requirements gradually
+            let currentSpacing = 16;
+            if (attempts > MAX_ATTEMPTS * 0.3) {
+                currentSpacing = 12;
+            } else if (attempts > MAX_ATTEMPTS * 0.6) {
+                currentSpacing = 8;
+            } else if (attempts > MAX_ATTEMPTS * 0.8) {
+                currentSpacing = 4;
             }
-        } while (( // Check if position is too close to existing instances or player
-            positionData.isTooClose ||
+            
+            if (attempts > MAX_ATTEMPTS / 2) {
+                positionData = this.getRandomPosition(positions, association.verticalOffset, currentSpacing);
+            }
+        } while ((
+            this.isPositionTooClose(positionData.liftedPosition, 16) ||
             (playerPosition && Vector3.Distance(positionData.liftedPosition, playerPosition) < MIN_PLAYER_DISTANCE)
         ) && attempts < MAX_ATTEMPTS);
         
-        // If we still couldn't find a position, force placement at the last attempted position
-        if (positionData.isTooClose) {
-            console.warn('Could not find optimal landmark position, forcing placement');
-        }
-        
         const scale = 1;
-        const scaleMatrix = Matrix.Scaling(scale, scale, scale);
-        const transitionMatrix = scaleMatrix
-            .multiply(positionData.rotationMatrix)
-            .multiply(Matrix.Translation(
-                positionData.liftedPosition.x,
-                positionData.liftedPosition.y,
-                positionData.liftedPosition.z
-            ));
+        const transitionMatrix = this.createTransformationMatrix(positionData, scale);
         
         const meshTemplate = association.meshTemplate!;
         meshTemplate.setEnabled(true);
@@ -133,28 +129,63 @@ export class MeshPlacementManager {
         association: MaterialMeshAssociation,
         positions: Vector3[],
     ): void {
-        let i = 0
+        let i = 0;
+        const MAX_ATTEMPTS_PER_INSTANCE = 50;
+        
+        console.log('--------------------------------')
+        console.log('Association density: ' + association.density)
+        console.log('Association meshTemplate: ' + association.meshTemplate)
+        
         while(i < association.density) {
-            const positionData = this.getRandomPosition(positions, association.verticalOffset)
-
-            if (positionData.isTooClose) {
-                i+= 0.5
-                continue;
+            console.log('Adding thin instances for association! Instance: ' + (i + 1) + '/' + association.density);
+            
+            let attempts = 0;
+            let positionData;
+            let validPositionFound = false;
+            
+            // Keep trying to find a valid position that's not too close to existing instances
+            do {
+                positionData = this.getRandomPosition(positions, association.verticalOffset);
+                attempts++;
+                
+                // Check if this position is too close to existing instances
+                if (!this.isPositionTooClose(positionData.liftedPosition, this.INSTANCE_FREE_RADIUS)) {
+                    validPositionFound = true;
+                } else if (attempts > MAX_ATTEMPTS_PER_INSTANCE * 0.7) {
+                    // If we're struggling to find a position, reduce the minimum distance requirement
+                    if (!this.isPositionTooClose(positionData.liftedPosition, this.INSTANCE_FREE_RADIUS * 0.5)) {
+                        validPositionFound = true;
+                    }
+                }
+                
+            } while (!validPositionFound && attempts < MAX_ATTEMPTS_PER_INSTANCE);
+            
+            if (validPositionFound) {
+                const scale = 1;
+                const transitionMatrix = this.createTransformationMatrix(positionData!, scale);
+                this.busyPositions.set(positionData!.liftedPosition, association.meshTemplate!.thinInstanceAdd(transitionMatrix));
+                i++; // Only increment if we successfully placed an instance
+            } else {
+                console.warn('Could not find valid position for instance after ' + MAX_ATTEMPTS_PER_INSTANCE + ' attempts. Skipping this instance.');
+                i++; // Still increment to avoid infinite loop, but log the issue
             }
-            i++;
-
-            const scale = 1;
-            const scaleMatrix = Matrix.Scaling(scale, scale, scale);
-            const transitionMatrix = scaleMatrix
-                .multiply(positionData.rotationMatrix)
-                .multiply(Matrix.Translation(
-                    positionData.liftedPosition.x,
-                    positionData.liftedPosition.y,
-                    positionData.liftedPosition.z
-                ));
-
-            this.busyPositions.set(positionData.position, association.meshTemplate!.thinInstanceAdd(transitionMatrix));
         }
+    }
+    
+    /**
+     * Check if a given position is too close to any existing instances
+     * @param position The position to check
+     * @param minDistance The minimum allowed distance
+     * @returns true if the position is too close to existing instances
+     */
+    private static isPositionTooClose(position: Vector3, minDistance: number): boolean {
+        for (const busyPosition of this.busyPositions.keys()) {
+            const distance = Vector3.Distance(position, busyPosition);
+            if (distance < minDistance) {
+                return true;
+            }
+        }
+        return false;
     }
     
     public static addAllThinInstancesForAssociation(
@@ -207,16 +238,11 @@ export class MeshPlacementManager {
         // Calculate lifted position using position normal
         const surfaceOffset = verticalOffset;
         const liftedPosition = randomPosition.add(positionNormal.scale(surfaceOffset));
-
-        const isTooClose = Array.from(this.busyPositions.keys()).some(existingPos =>
-            Vector3.Distance(existingPos, liftedPosition) < tooCloseMargin
-        );
     
         return {
             position: randomPosition,
             liftedPosition,
             rotationMatrix,
-            isTooClose
         };
     }
     
@@ -269,13 +295,13 @@ export class MeshPlacementManager {
                 totalPositionsNeeded += 1; // Only need one position for the landmark
             } else if (association.density > 0 && association.meshTemplate) {
                 // Add positions for regular meshes based on density
-                // Add a small buffer (2x) to account for positions that might be too close
-                totalPositionsNeeded += association.density * 2;
+                // Increase the buffer significantly to account for positions that might be too close
+                totalPositionsNeeded += association.density * 5; // More buffer for better position selection
             }
         }
         
         // Ensure we have at least a minimum number of positions to choose from
-        const MIN_POSITIONS = 20;
+        const MIN_POSITIONS = 100; // Increased minimum to give more position options
         totalPositionsNeeded = Math.max(totalPositionsNeeded, MIN_POSITIONS);
         
         // Generate only the positions we need
@@ -321,5 +347,16 @@ export class MeshPlacementManager {
         this.busyPositions.clear();
         this.oldLandmark = undefined;
         this.currentLandmark = undefined;
+    }
+
+    private static createTransformationMatrix(positionData: RandomPositionData, scale: number = 1): Matrix {
+        const scaleMatrix = Matrix.Scaling(scale, scale, scale);
+        return scaleMatrix
+            .multiply(positionData.rotationMatrix)
+            .multiply(Matrix.Translation(
+                positionData.liftedPosition.x,
+                positionData.liftedPosition.y,
+                positionData.liftedPosition.z
+            ));
     }
 }
