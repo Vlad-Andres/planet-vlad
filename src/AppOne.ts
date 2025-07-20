@@ -25,7 +25,6 @@ import { PlayerMovement } from './PlayerMovement';
 import { MeshLoader } from './MeshLoader';
 import { Inspector } from '@babylonjs/inspector';
 import { BiomeManager } from './BiomeManager';
-// import * as BABYLON from '@babylonjs/core'; 
 
 /**
  * Main application class that manages the 3D planet environment, camera, and game initialization.
@@ -49,32 +48,12 @@ export class AppOne {
  * @param canvas - The HTML canvas element where the 3D scene will be rendered
  */
 constructor(readonly canvas: HTMLCanvasElement) {
-        this.engine = new Engine(canvas)
-        window.addEventListener('resize', () => {
-            this.engine.resize();
-        });
-        this.scene = this.createScene(this.engine)
-        console.log('CAAAANVAS' + canvas)
+        this.engine = new Engine(canvas);
+        this.scene = this.createScene();
+        this.blurPostProcess = this.createBlurEffect();
         
-        // Add blur effect initially
-        this.blurPostProcess = new BlurPostProcess(
-            "blur",
-            new Vector2(4, 4),
-            2,
-            0.25,
-            null,
-            Texture.BILINEAR_SAMPLINGMODE,
-            this.engine
-        );
-        
-        // Listen for game start event from Vue component
-        document.addEventListener('game-start', () => {
-            if (this.scene.activeCamera) {
-                this.scene.activeCamera.detachPostProcess(this.blurPostProcess);
-            }
-            // Focus the canvas to enable keyboard controls
-            canvas.focus();
-        });
+        window.addEventListener('resize', () => this.engine.resize());
+        document.addEventListener('game-start', () => this.removeBlur());
     }
 
     /**
@@ -86,24 +65,35 @@ constructor(readonly canvas: HTMLCanvasElement) {
      */
     async initialize(): Promise<void> {
         console.log('Initializing AppOne...');
-        // Create the environment and setup camera
+        
         this.createEnvironment();
         this.playerMovement = new PlayerMovement(this.planet, this.scene);
         this.setupCamera();
-        new PlanetTransition(this.planet, false);
         
         // Attach blur effect to camera
-        if (this.scene.activeCamera) {
-            this.scene.activeCamera.attachPostProcess(this.blurPostProcess);
-        }
+        this.scene.activeCamera?.attachPostProcess(this.blurPostProcess);
         
-        // Load all meshes before starting the game
-        await this.registerMeshes(this.scene, this.planet)
-        .then(() => {
-            BiomeManager.initialize(this.scene);
-            // Spawn all objects after loading
-            PlanetTransition.imediatelySpawnAll(this.scene);
-        });        
+        // Initialize planet transition and load meshes
+        new PlanetTransition(this.planet, false);
+        await this.registerMeshes(this.scene, this.planet);
+        
+        // Initialize biome manager and spawn all objects
+        BiomeManager.initialize(this.scene);
+        PlanetTransition.imediatelySpawnAll(this.scene);
+    }
+
+    /**
+     * Starts the render loop and enables debugging.
+     * This method should be called after initialization to begin the game.
+     */
+    run(): void {
+        console.log('Running AppOne...');
+        this.canvas.focus();
+        
+        // Enable debug mode after a short delay
+        setTimeout(() => this.debug(true), 100);
+        
+        this.engine.runRenderLoop(() => this.scene.render());
     }
 
     /**
@@ -111,9 +101,8 @@ constructor(readonly canvas: HTMLCanvasElement) {
      * 
      * @param debugOn - Whether to enable (true) or disable (false) the debug layer
      */
-    debug(debugOn: boolean = true) {
+    private debug(debugOn: boolean = true): void {
         if (debugOn) {
-            // Use Inspector.Show with proper configuration to ensure left panel is visible
             Inspector.Show(this.scene, {
                 embedMode: true,
                 handleResize: true,
@@ -124,38 +113,34 @@ constructor(readonly canvas: HTMLCanvasElement) {
     }
 
     /**
-     * Starts the render loop and enables debugging.
-     * This method should be called after initialization to begin the game.
-     */
-    run() {
-        console.log('Running AppOne...');
-        // Ensure the canvas has focus before enabling debug
-        this.canvas.focus();
-        // Add a small delay to ensure the scene is fully ready before showing inspector
-        setTimeout(() => {
-            this.debug(true);
-        }, 100);
-        
-        this.engine.runRenderLoop(() => {
-            this.scene.render();
-        });
-    }
-
-    /**
      * Creates and configures a new Babylon.js scene.
      * Sets up basic scene properties and lighting.
      * 
      * @param engine - The Babylon.js engine instance
      * @returns The newly created scene
      */
-    createScene = function (engine: Engine) {
-        const scene = new Scene(engine)
-        scene.clearColor = new Color4(0, 0, 0, 1)
+    private createScene(): Scene {
+        const scene = new Scene(this.engine);
+        scene.clearColor = new Color4(0, 0, 0, 1);
+        new HemisphericLight('light1', new Vector3(0, 1, 0), scene).intensity = 0.7;
+        return scene;
+    }
 
-        // Setup lighting
-        new HemisphericLight('light1', new Vector3(0, 1, 0), scene).intensity = 0.7
-        
-        return scene
+    private createBlurEffect(): BlurPostProcess {
+        return new BlurPostProcess(
+            "blur",
+            new Vector2(4, 4),
+            2,
+            0.25,
+            null,
+            Texture.BILINEAR_SAMPLINGMODE,
+            this.engine
+        );
+    }
+
+    private removeBlur(): void {
+        this.scene.activeCamera?.detachPostProcess(this.blurPostProcess);
+        this.canvas.focus();
     }
 
     /**
@@ -167,43 +152,65 @@ constructor(readonly canvas: HTMLCanvasElement) {
      * @returns A promise that resolves when all meshes are loaded
      */
     private async registerMeshes(scene: Scene, planet: Mesh): Promise<void> {
-        // First load all tree models
-        await MeshLoader.loadModels(scene).then(() => {
-            PlanetTransition.registerMaterialMainLandmark(0, MeshLoader.getMesh("house") as Mesh, 34)
-            PlanetTransition
-                .registerMaterialMeshAssociation(0, MeshLoader.getMesh("tree1") as Mesh, 15, 15.5)
-            PlanetTransition
-                .registerMaterialMeshAssociation(0, MeshLoader.getMesh("bigTree") as Mesh, 5, 1.42)
-            PlanetTransition
-                .registerMaterialMeshAssociation(0, MeshLoader.getMesh("treeSimple") as Mesh, 8, 650)
-            PlanetTransition
-                .registerMaterialMeshAssociation(0, MeshLoader.getMesh("grass") as Mesh, 50, 261)
-    
-            PlanetTransition.registerMaterialMainLandmark(1, MeshLoader.getMesh("arch") as Mesh, 24)
-            PlanetTransition
-                .registerMaterialMeshAssociation(1, MeshLoader.getMesh("largeBuilding") as Mesh, 4, 3)
-            PlanetTransition
-                .registerMaterialMeshAssociation(1, MeshLoader.getMesh("largeBuilding2") as Mesh, 7, 3)
-            PlanetTransition
-                .registerMaterialMeshAssociation(1, MeshLoader.getMesh("skyscraper") as Mesh, 5, 9)
-            PlanetTransition
-                .registerMaterialMeshAssociation(1, MeshLoader.getMesh("statue") as Mesh, 2, 4.3)
-    
-            PlanetTransition.registerMaterialMainLandmark(2, MeshLoader.getMesh("books") as Mesh, 3.5)
-            PlanetTransition
-                .registerMaterialMeshAssociation(2, MeshLoader.getMesh("townHouse") as Mesh, 6, 12)
-            PlanetTransition
-                .registerMaterialMeshAssociation(2, MeshLoader.getMesh("chimney") as Mesh, 2, 1450)
-            PlanetTransition
-                .registerMaterialMeshAssociation(2, MeshLoader.getMesh("buildingRed") as Mesh, 4, 5.6)
-    
-            PlanetTransition.registerMaterialMainLandmark(3, MeshLoader.getMesh("volcano") as Mesh, 1.15)
-            PlanetTransition
-                .registerMaterialMeshAssociation(3, MeshLoader.getMesh("mount") as Mesh, 1, 9.5)
-            PlanetTransition
-                .registerMaterialMeshAssociation(3, MeshLoader.getMesh("brad") as Mesh, 5, 1.3)
-            PlanetTransition
-                .registerMaterialMeshAssociation(3, MeshLoader.getMesh("seagull") as Mesh, 1, 220)
+        await MeshLoader.loadModels(scene);
+        
+        // Biome configuration data
+        const biomeConfigs = [
+            // Biome 0: Grass/Nature
+            {
+                landmark: { name: "house", offset: 34 },
+                meshes: [
+                    { name: "tree1", density: 15, offset: 15.5 },
+                    { name: "bigTree", density: 5, offset: 1.42 },
+                    { name: "treeSimple", density: 8, offset: 650 },
+                    { name: "grass", density: 50, offset: 261 }
+                ]
+            },
+            // Biome 1: Urban
+            {
+                landmark: { name: "arch", offset: 24 },
+                meshes: [
+                    { name: "largeBuilding", density: 4, offset: 3 },
+                    { name: "largeBuilding2", density: 7, offset: 3 },
+                    { name: "skyscraper", density: 5, offset: 9 },
+                    { name: "statue", density: 2, offset: 4.3 }
+                ]
+            },
+            // Biome 2: Netherlands
+            {
+                landmark: { name: "books", offset: 3.5 },
+                meshes: [
+                    { name: "townHouse", density: 6, offset: 12 },
+                    { name: "chimney", density: 2, offset: 1450 },
+                    { name: "buildingRed", density: 4, offset: 5.6 }
+                ]
+            },
+            // Biome 3: Iceland
+            {
+                landmark: { name: "volcano", offset: 1.15 },
+                meshes: [
+                    { name: "mount", density: 1, offset: 9.5 },
+                    { name: "brad", density: 5, offset: 1.3 },
+                    { name: "seagull", density: 1, offset: 220 }
+                ]
+            }
+        ];
+
+        // Register all biomes
+        biomeConfigs.forEach((biome, index) => {
+            // Register landmark
+            const landmarkMesh = MeshLoader.getMesh(biome.landmark.name) as Mesh;
+            if (landmarkMesh) {
+                PlanetTransition.registerMaterialMainLandmark(index, landmarkMesh, biome.landmark.offset);
+            }
+
+            // Register meshes
+            biome.meshes.forEach(({ name, density, offset }) => {
+                const mesh = MeshLoader.getMesh(name) as Mesh;
+                if (mesh) {
+                    PlanetTransition.registerMaterialMeshAssociation(index, mesh, density, offset);
+                }
+            });
         });
     }
 

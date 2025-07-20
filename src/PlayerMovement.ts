@@ -1,49 +1,30 @@
 import {
     Scene,
-    Engine,
     Vector3,
-    Vector2,
-    HemisphericLight,
-    MeshBuilder,
-    FreeCamera,
-    Color3,
-    Color4,
-    PBRMaterial,
     KeyboardEventTypes,
     Mesh,
-    ArcRotateCamera,
     Matrix,
-    FollowCamera,
+    MeshBuilder
 } from '@babylonjs/core'
-import { Materials } from './Materials';
 import { PlanetTransition } from './PlanetTransition';
 import { BiomeManager } from './BiomeManager';
+
 export class PlayerMovement {
     player!: Mesh;
-    playerHeading!: Vector3;  // NEW: player's current tangent heading
+    playerHeading!: Vector3;
     planet!: Mesh;
-    private moveDirection = Vector3.Zero();
     private readonly MOVE_SPEED = 0.07;
     private keysPressed: Set<string> = new Set();
     static playerUP: Vector3 = Vector3.Zero();
-    private lastActionTime: number = 0;  // Track last action time
-    private readonly ACTION_DELAY: number = 500;  // Delay in milliseconds
+    private lastActionTime: number = 0;
+    private readonly ACTION_DELAY: number = 500;
     private currentBiomIndex: number = 0;
-    private readonly LANDMARK_PROXIMITY_THRESHOLD = 4; // Distance threshold for landmark interaction
-    // Biome-specific landmark proximity thresholds
-    private readonly BIOME_THRESHOLDS = [
-        34, // First biome (Childhood in Moldova) threshold
-        20, // Second biome (Moving to the Big City) threshold
-        1, // Third biome (The Netherlands) threshold
-        2,3  // Fourth biome (Iceland) threshold
-    ];
-    private readonly VERTICAL_OFFSET_FACTOR = 0.15; // Factor to adjust threshold based on vertical offset
-
+    private readonly BIOME_THRESHOLDS = [34, 20, 1, 2.3];
 
     constructor(planet: Mesh, scene: Scene) {
-        this.planet = planet
-        this.createPlayer(scene)
-        this.setupControls(scene)
+        this.planet = planet;
+        this.createPlayer(scene);
+        this.setupControls(scene);
     }
 
     private createPlayer(scene: Scene): void {
