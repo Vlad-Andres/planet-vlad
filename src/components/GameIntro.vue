@@ -86,9 +86,9 @@
 
 <script>
 import { ref, onMounted, nextTick } from 'vue';
-import { AppOne } from '../AppOne';
+import { AppOne } from '../core/AppOne';  // Fixed: was '../AppOne'
 import LoadingScreen from './LoadingScreen.vue';
-import { MeshLoader } from '../MeshLoader';
+import { MeshLoader } from '../managers/MeshLoader';  // Fixed: was '../MeshLoader'
 
 export default {
   name: 'GameIntro',

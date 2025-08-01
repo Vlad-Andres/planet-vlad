@@ -13,7 +13,7 @@ import {
 } from '@babylonjs/core';
 import { AdvancedDynamicTexture, TextBlock, Container, Control } from '@babylonjs/gui';
 import { Materials } from './Materials';
-import { PlanetTransition } from './PlanetTransition';
+import { PlanetTransition } from '../transitions/PlanetTransition';
 
 export class BiomeData {
     constructor(

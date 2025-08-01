@@ -6,8 +6,8 @@ import {
     Matrix,
     MeshBuilder
 } from '@babylonjs/core'
-import { PlanetTransition } from './PlanetTransition';
-import { BiomeManager } from './BiomeManager';
+import { PlanetTransition } from '../transitions/PlanetTransition';
+import { BiomeManager } from '../managers/BiomeManager';
 
 export class PlayerMovement {
     player!: Mesh;

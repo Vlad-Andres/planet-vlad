@@ -6,8 +6,8 @@ import {
     StandardMaterial,
     PBRMaterial
 } from '@babylonjs/core'
-import { Materials } from './Materials';
-import { MeshPlacementManager } from './MeshPlacementManager';
+import { Materials } from '../managers/Materials';
+import { MeshPlacementManager } from '../managers/MeshPlacementManager';
 
 export class PlanetTransition {
     public static transitionRunning: boolean = false;

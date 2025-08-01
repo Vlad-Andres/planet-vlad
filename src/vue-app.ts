@@ -1,5 +1,8 @@
+// Update import paths
+import { AppOne } from './core/AppOne'
+import { LandingScreen } from './core/LandingScreen'
+import GameIntro from './components/GameIntro.vue'  // Changed from LandingOverlay
 import { createApp } from 'vue'
-import LandingOverlay from './components/LandingOverlay.vue'
 
 // Create and mount the Vue application
 document.addEventListener('DOMContentLoaded', () => {
@@ -10,9 +13,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 const app = createApp({
   components: {
-    LandingOverlay
+    GameIntro  // Changed from LandingOverlay
   },
-  template: `<LandingOverlay @gameStart="handleGameStart" />`,
+  template: `<GameIntro @gameStart="handleGameStart" />`,  // Changed template
   setup() {
     const handleGameStart = () => {
       // Remove the blur effect from the scene

@@ -19,12 +19,12 @@ import {
     Vector2
 } from '@babylonjs/core'
 import { GLTFFileLoader } from "@babylonjs/loaders";
-import { Materials } from './Materials';
-import { PlanetTransition } from './PlanetTransition';
-import { PlayerMovement } from './PlayerMovement';
-import { MeshLoader } from './MeshLoader';
+import { Materials } from '../managers/Materials';
+import { PlanetTransition } from '../transitions/PlanetTransition';
+import { PlayerMovement } from '../systems/PlayerMovement';
+import { MeshLoader } from '../managers/MeshLoader';
 import { Inspector } from '@babylonjs/inspector';
-import { BiomeManager } from './BiomeManager';
+import { BiomeManager } from '../managers/BiomeManager';
 
 /**
  * Main application class that manages the 3D planet environment, camera, and game initialization.
@@ -75,7 +75,7 @@ constructor(readonly canvas: HTMLCanvasElement) {
         
         // Initialize planet transition and load meshes
         new PlanetTransition(this.planet, false);
-        await this.registerMeshes(this.scene, this.planet);
+        await this.registerMeshes(this.scene);
         
         // Initialize biome manager and spawn all objects
         BiomeManager.initialize(this.scene);
@@ -148,10 +148,9 @@ constructor(readonly canvas: HTMLCanvasElement) {
      * Associates meshes with specific biomes and positions them on the planet.
      * 
      * @param scene - The current Babylon.js scene
-     * @param planet - The planet mesh where objects will be placed
      * @returns A promise that resolves when all meshes are loaded
      */
-    private async registerMeshes(scene: Scene, planet: Mesh): Promise<void> {
+    private async registerMeshes(scene: Scene): Promise<void> {
         await MeshLoader.loadModels(scene);
         
         // Biome configuration data
@@ -219,6 +218,7 @@ constructor(readonly canvas: HTMLCanvasElement) {
      * Configures materials, lighting, and atmospheric effects to create a retro neon aesthetic.
      */
     createEnvironment(): void {
+        // TODO: add the save screen later that will have a rotating planet
         const scene = this.scene
         // Create planet
         this.planet = MeshBuilder.CreateSphere('planet', { diameter: 8, segments: 32, updatable:true }, scene)
