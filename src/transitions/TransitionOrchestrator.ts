@@ -20,6 +20,10 @@ export class TransitionOrchestrator {
         this.phases.push(phase);
     }
 
+    public clearPhases(): void {
+        this.phases = [];
+    }
+
     public async executeTransition(): Promise<boolean> {
         if (this.isTransitioning || !this.cooldownManager.canExecute()) {
             return false;

@@ -385,8 +385,8 @@ export class BiomeManager {
 
         // Transition is complete, apply the rest of the biome changes
         this.applyBiomeEnvironment(nextBiomeIndex);
-        // Remove narrative display
-        // this.showBiomeNarrative(this.biomes[nextBiomeIndex].narrative);
+        // Show narrative for the new biome
+        this.showBiomeNarrative(this.biomes[nextBiomeIndex].narrative);
         this.playBiomeSound(this.biomes[nextBiomeIndex].soundPath);
 
         // Check every frame if the transition is complete
@@ -400,6 +400,75 @@ export class BiomeManager {
                 scene.onBeforeRenderObservable.remove(observer);
             }
         });
+    }
+    
+    private static showBiomeNarrative(narrative: string): void {
+        if (!this.scene || !narrative) return;
+        
+        // Clean up previous UI if exists
+        if (this.cooldownUI) {
+            this.cooldownUI.dispose();
+        }
+        
+        // Create fullscreen UI
+        this.cooldownUI = AdvancedDynamicTexture.CreateFullscreenUI("BiomeNarrativeUI", true, this.scene);
+        
+        // Create container for text
+        const container = new Container("narrativeContainer");
+        container.width = 0.8;
+        container.height = "120px";
+        container.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+        container.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+        container.top = "-50px";
+        container.zIndex = 10;
+        container.background = "rgba(0, 0, 0, 0.7)";
+        this.cooldownUI.addControl(container);
+        
+        // Create text block for biome narrative
+        const narrativeText = new TextBlock("narrativeText");
+        narrativeText.text = narrative;
+        narrativeText.color = "#FFFFFF";
+        narrativeText.fontSize = 18;
+        narrativeText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+        narrativeText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+        narrativeText.paddingTop = "10px";
+        container.addControl(narrativeText);
+        
+        // Create text block for cooldown message
+        this.cooldownMessage = new TextBlock("cooldownText");
+        this.cooldownMessage.text = `Please wait ${Math.ceil(this.cooldownPeriod / 1000)} seconds before changing biomes...`;
+        this.cooldownMessage.color = "#FFA500";
+        this.cooldownMessage.fontSize = 16;
+        this.cooldownMessage.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+        this.cooldownMessage.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+        this.cooldownMessage.paddingBottom = "10px";
+        container.addControl(this.cooldownMessage);
+        
+        // Update the countdown timer every second
+        let timeRemaining = Math.ceil(this.cooldownPeriod / 1000);
+        const countdownInterval = setInterval(() => {
+            timeRemaining--;
+            if (timeRemaining <= 0) {
+                clearInterval(countdownInterval);
+                if (this.cooldownUI) {
+                    this.cooldownUI.dispose();
+                    this.cooldownUI = null;
+                    this.cooldownMessage = null;
+                }
+            } else if (this.cooldownMessage) {
+                this.cooldownMessage.text = `Please wait ${timeRemaining} seconds before changing biomes...`;
+            }
+        }, 1000);
+        
+        // Auto-dispose after the cooldown period ends
+        setTimeout(() => {
+            clearInterval(countdownInterval);
+            if (this.cooldownUI) {
+                this.cooldownUI.dispose();
+                this.cooldownUI = null;
+                this.cooldownMessage = null;
+            }
+        }, this.cooldownPeriod);
     }
     
     private static applyBiomeEnvironment(biomeIndex: number): void {
@@ -434,11 +503,6 @@ export class BiomeManager {
         // Update the last biome change time when environment is applied
         // This ensures the cooldown starts when the biome is actually loaded
         this.lastBiomeChangeTime = Date.now();
-    }
-    
-    private static showBiomeNarrative(narrative: string): void {
-        // Do nothing - narrative display is disabled
-        return;
     }
     
     private static showCooldownMessage(scene: Scene, remainingTime: number): void {
@@ -589,6 +653,10 @@ export class BiomeManager {
     
     public static getBiomeCount(): number {
         return this.biomes.length;
+    }
+    
+    public static getBiomes(): BiomeData[] {
+        return this.biomes;
     }
     
     public static dispose(): void {

@@ -1,4 +1,5 @@
 import { BiomeData } from './BiomeManager';
+import { BiomeManager } from './BiomeManager';
 
 export class BiomeDataManager {
     private biomes: BiomeData[] = [];
@@ -9,9 +10,7 @@ export class BiomeDataManager {
     }
 
     private initializeBiomes(): void {
-        // Initialize with the same biomes from BiomeManager
-        // This should be moved here from BiomeManager.setupBiomes()
-        // For now, we'll keep it simple
+        this.biomes = BiomeManager.getBiomes();
     }
 
     public setBiomes(biomes: BiomeData[]): void {

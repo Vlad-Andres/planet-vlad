@@ -21,12 +21,19 @@ export class PlayerMovement {
     private currentBiomIndex: number = 0;
     private readonly BIOME_THRESHOLDS = [34, 20, 1, 2.3];
 
-    constructor(planet: Mesh, scene: Scene) {
+    constructor(planet: Mesh, scene: Scene, enableInternalControls: boolean = true) {
         this.planet = planet;
         this.createPlayer(scene);
-        this.setupControls(scene);
+        if (enableInternalControls) {
+            this.setupControls(scene);
+        }
     }
 
+    // public wrappers used by GameSystemManager
+    public moveForward(): void { this.movePlayerArc(this.MOVE_SPEED); }
+    public moveBackward(): void { this.movePlayerArc(-this.MOVE_SPEED); }
+    public rotateLeft(): void { this.rotatePlayerHeading(0.1); }
+    public rotateRight(): void { this.rotatePlayerHeading(-0.1); }
     private createPlayer(scene: Scene): void {
         // Create player
         this.player = MeshBuilder.CreateSphere('player', { diameter: 1, segments: 16 }, scene);
@@ -82,7 +89,7 @@ export class PlayerMovement {
         //     this.currentBiomIndex++;
         // }
     }
-
+    // OLD way, disabled, now TransitionPhase takes care of it
     private setupControls(scene: Scene): void {
         scene.onKeyboardObservable.add((kbInfo) => {
             // this.runTransitionIfApplicable(scene)

@@ -25,6 +25,7 @@ import { PlayerMovement } from '../systems/PlayerMovement';
 import { MeshLoader } from '../managers/MeshLoader';
 import { Inspector } from '@babylonjs/inspector';
 import { BiomeManager } from '../managers/BiomeManager';
+import { GameSystemManager } from './GameSystemManager';
 
 /**
  * Main application class that manages the 3D planet environment, camera, and game initialization.
@@ -65,10 +66,21 @@ constructor(readonly canvas: HTMLCanvasElement) {
      */
     async initialize(): Promise<void> {
         console.log('Initializing AppOne...');
-        
+
         this.createEnvironment();
-        this.playerMovement = new PlayerMovement(this.planet, this.scene);
-        this.setupCamera();
+
+        // 1️⃣  Player and camera setup comes first
+        this.playerMovement = new PlayerMovement(this.planet, this.scene, false);
+        this.setupCamera(); // ✅ Keep this one
+
+        // 2️⃣  Now that a camera exists, BiomeManager can create the blur effect safely
+        BiomeManager.initialize(this.scene);
+
+        // 3️⃣  Other systems that depend on biomes
+        const gsm = new GameSystemManager(this.scene);
+        gsm.setPlayerMovement(this.playerMovement);
+
+        // this.setupCamera(); ❌ Remove this duplicate call - it's creating a new camera that loses lock to player
         
         // Attach blur effect to camera
         this.scene.activeCamera?.attachPostProcess(this.blurPostProcess);
@@ -77,8 +89,7 @@ constructor(readonly canvas: HTMLCanvasElement) {
         new PlanetTransition(this.planet, false);
         await this.registerMeshes(this.scene);
         
-        // Initialize biome manager and spawn all objects
-        BiomeManager.initialize(this.scene);
+        // Planet objects are spawned only once biomes are ready
         PlanetTransition.imediatelySpawnAll(this.scene);
     }
 
@@ -262,7 +273,7 @@ constructor(readonly canvas: HTMLCanvasElement) {
     setupCamera(): void {
         this.camera = new FollowCamera("camera", new Vector3(-Math.PI/2, Math.PI/4, 6), this.scene);        
         const player = this.scene.getMeshByName("player") as Mesh;
-
+    
         const cameraDistance = 12;
         this.camera.lockedTarget = player;
         this.camera.radius = cameraDistance;
@@ -270,16 +281,22 @@ constructor(readonly canvas: HTMLCanvasElement) {
         this.camera.cameraAcceleration = 0.05;
         this.camera.maxCameraSpeed = 20;
         this.camera.attachControl();
-
+    
         // Keep camera's position and orientation stable using player's heading and up vector
         this.scene.onBeforeRenderObservable.add(() => {
             const playerUp = player.position.subtract(this.planet.position).normalize();
             const playerForward = this.playerMovement.getCurrentHeading();
             const playerRight = Vector3.Cross(playerForward, playerUp).normalize();
             const adjustedForward = Vector3.Cross(playerUp, playerRight).normalize();
-
-            const cameraOffset = adjustedForward.scale(-cameraDistance);
-            this.camera.position = player.position.add(cameraOffset);
+    
+            // Use the camera's radius property instead of hardcoded distance
+            const currentCameraDistance = this.camera.radius;
+            const cameraOffset = adjustedForward.scale(-currentCameraDistance);
+            
+            // Apply height offset
+            const heightOffset = playerUp.scale(this.camera.heightOffset);
+            
+            this.camera.position = player.position.add(cameraOffset).add(heightOffset);
             this.camera.upVector = Vector3.Lerp(this.camera.upVector, playerUp, 0.1); // Smooth transition
         });
     }

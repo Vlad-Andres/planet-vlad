@@ -12,7 +12,7 @@ import { MeshPlacementManager } from '../managers/MeshPlacementManager';
 export class PlanetTransition {
     public static transitionRunning: boolean = false;
     public static sphere: Mesh;
-    private static startWithMaterial: number = 3;
+    private static startWithMaterial: number = 0; // Changed from 3 to 0 for grass biome
 
     constructor(sphere: Mesh, debug: boolean = false) {
         PlanetTransition.sphere = sphere;
@@ -66,7 +66,7 @@ export class PlanetTransition {
         console.log('Initial biome setup');
         const sphere = scene.getMeshByName('planet') as Mesh;
         this.sphere = sphere;
-        const materialIndex = this.startWithMaterial;
+        const materialIndex = this.startWithMaterial; // This will now be 0 (grass)
         
         Materials.changeActiveMaterial(materialIndex);
         const material = Materials.getActiveMaterial();
