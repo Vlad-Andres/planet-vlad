@@ -1,52 +1,42 @@
 import { Scene } from '@babylonjs/core';
 import { BiomeDataManager } from '../managers/BiomeDataManager';
 import { CooldownManager } from '../systems/CooldownManager';
-
-export interface TransitionPhase {
-    name: string;
-    execute(): Promise<void>;
-}
+import { TransitionPhase } from './phases/TransitionPhase';
 
 export class TransitionOrchestrator {
     private phases: TransitionPhase[] = [];
-    private isTransitioning = false;
-    private cooldownManager: CooldownManager;
+    private isRunning = false;
 
-    constructor(private scene: Scene, private biomeData: BiomeDataManager) {
-        this.cooldownManager = new CooldownManager(4000);
-    }
-
-    public addPhase(phase: TransitionPhase): void {
+    addPhase(phase: TransitionPhase): void {
         this.phases.push(phase);
+        console.log(`Added phase: ${phase.name}`);
     }
 
-    public clearPhases(): void {
+    clearPhases(): void {
         this.phases = [];
+        console.log('Cleared all phases');
     }
 
-    public async executeTransition(): Promise<boolean> {
-        if (this.isTransitioning || !this.cooldownManager.canExecute()) {
-            return false;
+    async executeTransition(): Promise<void> {
+        if (this.isRunning) {
+            console.log('Transition already running, skipping');
+            return;
         }
 
-        this.isTransitioning = true;
-        this.cooldownManager.markExecution();
+        this.isRunning = true;
+        console.log(`Starting transition with ${this.phases.length} phases`);
 
         try {
             for (const phase of this.phases) {
+                console.log(`Executing phase: ${phase.name}`);
                 await phase.execute();
+                console.log(`Phase completed: ${phase.name}`);
             }
-            return true;
+            console.log('All transition phases completed');
+        } catch (error) {
+            console.error('Error during transition:', error);
         } finally {
-            this.isTransitioning = false;
+            this.isRunning = false;
         }
-    }
-
-    public isCurrentlyTransitioning(): boolean {
-        return this.isTransitioning;
-    }
-
-    public getCooldownRemaining(): number {
-        return this.cooldownManager.getRemainingCooldown();
     }
 }

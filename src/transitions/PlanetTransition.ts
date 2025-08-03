@@ -56,7 +56,7 @@ export class PlanetTransition {
         MeshPlacementManager.clearInstances(Materials.getActiveMaterialIndex());
         Materials.changeActiveMaterial();
         sphere.material = Materials.getActiveMaterial();
-        sphere.material.wireframe = true;
+        sphere.material.wireframe = false;
         
         const nextMaterialIndex = Materials.getActiveMaterialIndex();
         MeshPlacementManager.placeMeshesForMaterial(nextMaterialIndex);
@@ -71,7 +71,7 @@ export class PlanetTransition {
         Materials.changeActiveMaterial(materialIndex);
         const material = Materials.getActiveMaterial();
         sphere.material = material;
-        sphere.material.wireframe = true;
+        sphere.material.wireframe = false;
         
         if (sphere.material) {
             sphere.material.markAsDirty(Material.AllDirtyFlag);

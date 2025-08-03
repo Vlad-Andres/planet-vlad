@@ -358,7 +358,6 @@ export class BiomeManager {
         const timeSinceLastChange = currentTime - this.lastBiomeChangeTime;
         
         if (timeSinceLastChange < this.cooldownPeriod) {
-            console.log('too soon')
             // Not enough time has passed, show cooldown message
             const remainingTime = Math.ceil((this.cooldownPeriod - timeSinceLastChange) / 1000);
             this.showCooldownMessage(scene, remainingTime);

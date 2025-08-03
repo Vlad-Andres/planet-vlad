@@ -64,7 +64,7 @@ constructor(readonly canvas: HTMLCanvasElement) {
      * 
      * @returns A promise that resolves when initialization is complete
      */
-    async initialize(): Promise<void> {
+    public async initialize(): Promise<void> {
         console.log('Initializing AppOne...');
 
         this.createEnvironment();
@@ -97,7 +97,7 @@ constructor(readonly canvas: HTMLCanvasElement) {
      * Starts the render loop and enables debugging.
      * This method should be called after initialization to begin the game.
      */
-    run(): void {
+    public run(): void {
         console.log('Running AppOne...');
         this.canvas.focus();
         

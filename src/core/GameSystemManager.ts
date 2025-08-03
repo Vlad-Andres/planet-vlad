@@ -3,8 +3,8 @@ import { InputManager } from '../systems/InputManager';
 import { TransitionOrchestrator } from '../transitions/TransitionOrchestrator';
 import { BiomeDataManager } from '../managers/BiomeDataManager';
 import { BiomeEnvironmentApplier } from '../systems/BiomeEnvironmentApplier';
-import { ZoomInPhase, CutscenePhase, BiomeEnvironmentPhase, ZoomOutPhase } from '../transitions/TransitionPhases';
 import { PlayerMovement } from '../systems/PlayerMovement';
+import { ZoomInPhase, ZoomOutPhase, TunnelJourneyPhase, BiomeEnvironmentPhase } from '../transitions/phases';
 
 export class GameSystemManager {
     private inputManager: InputManager;
@@ -16,7 +16,7 @@ export class GameSystemManager {
     constructor(private scene: Scene) {
         this.biomeDataManager = new BiomeDataManager();
         this.environmentApplier = new BiomeEnvironmentApplier(scene);
-        this.transitionOrchestrator = new TransitionOrchestrator(scene, this.biomeDataManager);
+        this.transitionOrchestrator = new TransitionOrchestrator();
         this.inputManager = new InputManager(scene);
         
         this.setupEventHandlers();
@@ -29,12 +29,12 @@ export class GameSystemManager {
     }
 
     private setupTransitionPhases(): void {
-        // Get player mesh from scene
+        // Get required meshes from scene
         const playerMesh = this.scene.getMeshByName('player') as Mesh;
-        console.log('Setting up transition phases, player mesh:', playerMesh);
+        const planetMesh = this.scene.getMeshByName('planet') as Mesh;
         
-        if (!playerMesh) {
-            console.error('Player mesh not found in scene');
+        if (!playerMesh || !planetMesh) {
+            console.error('Required meshes not found in scene');
             return;
         }
 
@@ -43,17 +43,22 @@ export class GameSystemManager {
             return;
         }
 
-        console.log('Camera type:', this.scene.activeCamera.getClassName());
-        console.log('Camera:', this.scene.activeCamera);
-
         // Clear any existing phases first
         this.transitionOrchestrator.clearPhases();
-
-        // Add phases in sequence: zoom in -> biome transition -> zoom out
+    
+        // Add phases in the correct order:
+        // 1. Zoom in to the player
         this.transitionOrchestrator.addPhase(new ZoomInPhase(this.scene.activeCamera!, playerMesh));
-        this.transitionOrchestrator.addPhase(new BiomeEnvironmentPhase(this.scene, this.biomeDataManager, this.environmentApplier));
-        this.transitionOrchestrator.addPhase(new ZoomOutPhase(this.scene.activeCamera!));
         
+        // 2. Journey through the planet (moves both camera and player)
+        this.transitionOrchestrator.addPhase(new TunnelJourneyPhase(this.scene.activeCamera!, playerMesh, planetMesh));
+        // this.transitionOrchestrator.addPhase(new BiomeEnvironmentPhase(this.scene, this.biomeDataManager, this.environmentApplier));
+
+        // 3. Zoom out when on the other side
+        this.transitionOrchestrator.addPhase(new ZoomOutPhase(this.scene.activeCamera!, playerMesh));
+        
+        // 4. Change biome environment
+    
         console.log('Transition phases setup complete');
     }
 
