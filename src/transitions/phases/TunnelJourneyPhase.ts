@@ -28,7 +28,7 @@ export class TunnelJourneyPhase implements TransitionPhase {
             
             // Create video element
             const video = document.createElement('video');
-            video.src = '/planet-vlad/videos/travel.mp4';
+            video.src = '/planet-vlad/videos/travel.mov';
             video.loop = false;
             video.muted = true;
             video.style.position = 'fixed';
