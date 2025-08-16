@@ -1,4 +1,4 @@
-import { Camera, Mesh, FollowCamera } from '@babylonjs/core';
+import { Camera, Mesh, FollowCamera, PostProcess, Effect } from '@babylonjs/core';
 import { TransitionPhase } from './TransitionPhase';
 import { BiomeManager } from '../../managers/BiomeManager';
 
@@ -15,103 +15,111 @@ export class TunnelJourneyPhase implements TransitionPhase {
             }
             
             const followCamera = this.camera as FollowCamera;
-            this.closeEyesWithVideoEffect(followCamera).then(() => {
+            this.closeEyesWithEyelidEffect(followCamera).then(() => {
                 resolve();
             });
         });
     }
     
-    private closeEyesWithVideoEffect(followCamera: FollowCamera): Promise<void> {
+    private closeEyesWithEyelidEffect(followCamera: FollowCamera): Promise<void> {
         return new Promise((resolve) => {
-            const originalFov = followCamera.fov;
             const scene = followCamera.getScene();
-            
-            // Create video element
-            const video = document.createElement('video');
-            video.src = '/planet-vlad/videos/travel.mov';
-            video.loop = false;
-            video.muted = true;
-            video.style.position = 'fixed';
-            video.style.top = '0';
-            video.style.left = '0';
-            video.style.width = '100vw';
-            video.style.height = '100vh';
-            video.style.objectFit = 'cover';
-            video.style.zIndex = '1000';
-            video.style.display = 'none';
-            document.body.appendChild(video);
-            
+
+            // Register shader only once (eyelid-style vertical mask)
+            if (!Effect.ShadersStore["eyelidCloseFragmentShader"]) {
+                Effect.ShadersStore["eyelidCloseFragmentShader"] = `
+                precision highp float;
+                varying vec2 vUV;
+                uniform sampler2D textureSampler;
+                uniform float openHeight;  // half-height of the visible slit (can be negative to force full close)
+                uniform float softness;    // softness width of eyelid edge
+                uniform float centerY;     // vertical center of the slit
+                uniform float curvature;   // 0.0 flat eyelids, 1.0 strong curvature
+
+                void main(void) {
+                    vec4 color = texture2D(textureSampler, vUV);
+                    // Horizontal distance from center (0..1)
+                    float x = abs(vUV.x - 0.5) * 2.0;
+                    // Curved eyelid: reduce opening more toward edges
+                    float curveFactor = clamp(1.0 - curvature * x * x, 0.0, 1.0);
+                    // allow negative to fully close
+                    float localOpen = openHeight * curveFactor;
+                    // Distance from current pixel to slit center along Y
+                    float d = abs(vUV.y - centerY);
+                    // Edge factor: 0 inside slit (fully visible), 1 outside (fully black)
+                    float edge = smoothstep(localOpen, localOpen + softness, d);
+                    // If localOpen is sufficiently negative, force full black
+                    edge = (localOpen <= -0.05) ? 1.0 : edge;
+                    vec4 black = vec4(0.0, 0.0, 0.0, 1.0);
+                    gl_FragColor = mix(color, black, edge);
+                }
+                `;
+            }
+
+            const eyelid = new PostProcess(
+                "EyelidClose",
+                "eyelidClose",
+                ["openHeight", "softness", "centerY", "curvature"],
+                null,
+                1.0,
+                followCamera
+            );
+
+            // Initial values
+            let openHeight = 0.5;     // fully open (entire screen visible)
+            const minOpen = -0.25;    // overshoot negative to ensure full black at center
+            const maxOpen = 0.5;      // fully open
+            const softness = 0.08;    // slightly crisper close
+            const centerY = 0.5;      // close to camera center
+            const curvature = 0.45;   // eyelid curvature intensity
+
+            // Timing
             let frame = 0;
-            const closeFrames = 30;      // 1s to close eyes (faster)
-            const blackFrames = 5;      // 0.25s black screen (shorter)
-            const videoFrames = 60;     // 2s video duration (reduced from 4s)
-            const openFrames = 30;       // 1s to open eyes (faster)
-            const totalFrames = closeFrames + blackFrames + videoFrames + openFrames;
-            
-            let videoStarted = false;
-            let environmentChanged = false;
-            
-            // Smooth easing function for natural eye movement
+            const closeFrames = 40; // ~0.65s
+            const holdFrames = 10;  // brief hold
+            const openFrames = 40;  // ~0.65s
+            const totalFrames = closeFrames + holdFrames + openFrames;
+
+            let switched = false;
+
             const easeInOutCubic = (t: number): number => {
                 return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
             };
-            
+
+            eyelid.onApply = (effect: Effect) => {
+                effect.setFloat("openHeight", openHeight);
+                effect.setFloat("softness", softness);
+                effect.setFloat("centerY", centerY);
+                effect.setFloat("curvature", curvature);
+            };
+
             const animate = () => {
                 frame++;
-                
                 if (frame <= closeFrames) {
-                    // Phase 1: Close eyes smoothly by reducing FOV
-                    const rawProgress = frame / closeFrames;
-                    const smoothProgress = easeInOutCubic(rawProgress);
-                    followCamera.fov = originalFov * (1 - smoothProgress);
-                    
-                } else if (frame <= closeFrames + blackFrames) {
-                    // Phase 2: Eyes completely closed (FOV = 0)
-                    followCamera.fov = 0;
-                    
-                } else if (frame <= closeFrames + blackFrames + videoFrames) {
-                    // Phase 3: Show video while eyes are closed
-                    followCamera.fov = 0; // Keep eyes closed
-                    
-                    if (!videoStarted) {
-                        video.style.display = 'block';
-                        video.play();
-                        videoStarted = true;
-                    }
-                    
-                    // Change environment halfway through the video
-                    if (!environmentChanged && frame >= closeFrames + blackFrames + (videoFrames / 2)) {
+                    const raw = frame / closeFrames;
+                    const eased = easeInOutCubic(raw);
+                    openHeight = maxOpen + (minOpen - maxOpen) * eased; // close
+                } else if (frame <= closeFrames + holdFrames) {
+                    openHeight = minOpen;
+                    if (!switched) {
                         BiomeManager.goToNextBiome(scene);
-                        environmentChanged = true;
+                        switched = true;
                     }
-                    
                 } else {
-                    // Phase 4: Hide video and open eyes by restoring FOV
-                    if (videoStarted) {
-                        video.style.display = 'none';
-                        video.pause();
-                        videoStarted = false;
-                    }
-                    
-                    const rawProgress = (frame - closeFrames - blackFrames - videoFrames) / openFrames;
-                    const smoothProgress = easeInOutCubic(rawProgress);
-                    followCamera.fov = originalFov * smoothProgress;
+                    const raw = (frame - closeFrames - holdFrames) / openFrames;
+                    const eased = easeInOutCubic(raw);
+                    openHeight = minOpen + (maxOpen - minOpen) * eased; // open
                 }
-                
+
                 if (frame < totalFrames) {
                     requestAnimationFrame(animate);
                 } else {
-                    // Restore original FOV
-                    followCamera.fov = originalFov;
-                    
-                    // Clean up video element
-                    if (document.body.contains(video)) {
-                        document.body.removeChild(video);
-                    }
+                    // Cleanup
+                    eyelid.dispose();
                     resolve();
                 }
             };
-            
+
             requestAnimationFrame(animate);
         });
     }
