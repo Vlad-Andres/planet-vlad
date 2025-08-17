@@ -65,7 +65,14 @@ export class GameSystemManager {
     private setupEventHandlers(): void {
         this.inputManager.on('biome-transition-requested', async () => {
             console.log('Biome transition requested');
-            await this.transitionOrchestrator.executeTransition();
+            // Disable input during the entire transition animation
+            this.inputManager.disable();
+            try {
+                await this.transitionOrchestrator.executeTransition();
+            } finally {
+                // Re-enable input after transitions complete or on error
+                this.inputManager.enable();
+            }
         });
         this.inputManager.on('player-move-forward', () => this.playerMovement?.moveForward());
         this.inputManager.on('player-move-backward', () => this.playerMovement?.moveBackward());

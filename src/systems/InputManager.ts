@@ -9,6 +9,7 @@ export class InputManager {
     private eventHandlers = new Map<string, ((event: GameEvent) => void)[]>();
     private scene: Scene;
     private keysPressed = new Set<string>();
+    private enabled = true;
 
     constructor(scene: Scene) {
         this.scene = scene;
@@ -29,9 +30,30 @@ export class InputManager {
         }
     }
 
+    public enable(): void {
+        this.enabled = true;
+    }
+
+    public disable(): void {
+        this.enabled = false;
+        // Clear pressed keys so nothing is "stuck" when we re-enable
+        this.keysPressed.clear();
+    }
+
+    public isEnabled(): boolean {
+        return this.enabled;
+    }
+
     private setupKeyboardListeners(): void {
         this.scene.onKeyboardObservable.add((kbInfo) => {
             const key = kbInfo.event.key.toLowerCase();
+            if (!this.enabled) {
+                // While disabled, we still clear keys on KEYUP just in case
+                if (kbInfo.type === KeyboardEventTypes.KEYUP) {
+                    this.keysPressed.delete(key);
+                }
+                return;
+            }
             if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
                 this.keysPressed.add(key);
             } else if (kbInfo.type === KeyboardEventTypes.KEYUP) {
@@ -40,6 +62,7 @@ export class InputManager {
         });
 
         this.scene.onBeforeRenderObservable.add(() => {
+            if (!this.enabled) return;
             // Movement keys
             if (this.keysPressed.has('w')) {
                 this.emit({ type: 'player-move-forward' });
