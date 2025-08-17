@@ -26,6 +26,7 @@ import { MeshLoader } from '../managers/MeshLoader';
 import { Inspector } from '@babylonjs/inspector';
 import { BiomeManager } from '../managers/BiomeManager';
 import { GameSystemManager } from './GameSystemManager';
+import { AdvancedDynamicTexture, TextBlock, Control } from '@babylonjs/gui';
 
 /**
  * Main application class that manages the 3D planet environment, camera, and game initialization.
@@ -42,19 +43,19 @@ export class AppOne {
     materials: PBRMaterial[] = [];
     currentMaterialIndex = 0;
 
-/**
- * Creates a new AppOne instance and initializes the Babylon.js engine and scene.
- * Sets up event listeners and creates the initial blur post-process effect.
- * 
- * @param canvas - The HTML canvas element where the 3D scene will be rendered
- */
-constructor(readonly canvas: HTMLCanvasElement) {
-        this.engine = new Engine(canvas);
-        this.scene = this.createScene();
-        this.blurPostProcess = this.createBlurEffect();
-        
-        window.addEventListener('resize', () => this.engine.resize());
-        document.addEventListener('game-start', () => this.removeBlur());
+    /**
+     * Creates a new AppOne instance and initializes the Babylon.js engine and scene.
+     * Sets up event listeners and creates the initial blur post-process effect.
+     * 
+     * @param canvas - The HTML canvas element where the 3D scene will be rendered
+     */
+    constructor(readonly canvas: HTMLCanvasElement) {
+            this.engine = new Engine(canvas);
+            this.scene = this.createScene();
+            this.blurPostProcess = this.createBlurEffect();
+            
+            window.addEventListener('resize', () => this.engine.resize());
+            document.addEventListener('game-start', () => this.removeBlur());
     }
 
     /**
@@ -67,29 +68,28 @@ constructor(readonly canvas: HTMLCanvasElement) {
     public async initialize(): Promise<void> {
         console.log('Initializing AppOne...');
 
+        // Create planet and environment
         this.createEnvironment();
 
-        // 1️⃣  Player and camera setup comes first
+        // Player and camera setup comes first
         this.playerMovement = new PlayerMovement(this.planet, this.scene, false);
-        this.setupCamera(); // ✅ Keep this one
+        this.setupCamera();
 
-        // 2️⃣  Now that a camera exists, BiomeManager can create the blur effect safely
+        // Now that a camera exists, initialize biome systems (they may attach post-processes/UI)
         BiomeManager.initialize(this.scene);
 
-        // 3️⃣  Other systems that depend on biomes
+        // Other systems that depend on biomes
         const gsm = new GameSystemManager(this.scene);
         gsm.setPlayerMovement(this.playerMovement);
 
-        // this.setupCamera(); ❌ Remove this duplicate call - it's creating a new camera that loses lock to player
-        
-        // Attach blur effect to camera
+        // Attach blur effect to camera until the game begins
         this.scene.activeCamera?.attachPostProcess(this.blurPostProcess);
-        
+
         // Initialize planet transition and load meshes
         new PlanetTransition(this.planet, false);
         await this.registerMeshes(this.scene);
-        
-        // Planet objects are spawned only once biomes are ready
+
+        // Spawn all planet objects once biomes are ready
         PlanetTransition.imediatelySpawnAll(this.scene);
     }
 
@@ -103,8 +103,43 @@ constructor(readonly canvas: HTMLCanvasElement) {
         
         // Enable debug mode after a short delay
         setTimeout(() => this.debug(true), 100);
+
+        // Initialize FPS counter overlay
+        this.initFpsCounter();
         
         this.engine.runRenderLoop(() => this.scene.render());
+    }
+
+    /**
+     * Initialize a small on-screen FPS counter using Babylon GUI
+     */
+    private initFpsCounter(): void {
+        const ui = AdvancedDynamicTexture.CreateFullscreenUI('fps-ui', true, this.scene);
+        const fpsText = new TextBlock('fpsText');
+        fpsText.text = 'FPS: --';
+        fpsText.color = 'red';
+        fpsText.fontFamily = 'monospace';
+        fpsText.fontSize = 16;
+        fpsText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+        fpsText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+        fpsText.paddingLeft = '8px';
+        fpsText.paddingTop = '6px';
+        fpsText.shadowBlur = 6;
+        fpsText.shadowColor = 'black';
+        fpsText.shadowOffsetX = 0;
+        fpsText.shadowOffsetY = 0;
+        ui.addControl(fpsText);
+
+        // Update FPS at a throttled interval to reduce overhead
+        let lastUpdate = 0;
+        this.scene.onBeforeRenderObservable.add(() => {
+            const now = performance.now();
+            if (now - lastUpdate > 250) { // update ~4 times per second
+                const fps = Math.round(this.engine.getFps());
+                fpsText.text = `FPS: ${fps}`;
+                lastUpdate = now;
+            }
+        });
     }
 
     /**
