@@ -13,7 +13,7 @@ import {
 } from '@babylonjs/core';
 import { AdvancedDynamicTexture, TextBlock, Container, Control } from '@babylonjs/gui';
 import { Materials } from './Materials';
-import { PlanetTransition } from './PlanetTransition';
+import { PlanetTransition } from '../transitions/PlanetTransition';
 
 export class BiomeData {
     constructor(
@@ -50,7 +50,7 @@ export class BiomeManager {
     private static initialized: boolean = false;
     private static horizonBlurEffect: PostProcess | null = null;
     private static lastBiomeChangeTime: number = 0;
-    private static cooldownPeriod: number = 20000; // 20 seconds in milliseconds
+    private static cooldownPeriod: number = 4000; // 20 seconds in milliseconds
     private static cooldownMessage: TextBlock | null = null;
     private static cooldownUI: AdvancedDynamicTexture | null = null;
 
@@ -83,32 +83,32 @@ export class BiomeManager {
                 });
             }
             
-            // Add a render observer to update effect parameters each frame with improved error handling
-            scene.onBeforeRenderObservable.add(() => {
-                if (!this.horizonBlurEffect || !this.horizonBlurEffect.getEffect()) return;
+            // // Add a render observer to update effect parameters each frame with improved error handling TODO: find out if necessary
+            // scene.onBeforeRenderObservable.add(() => {
+            //     if (!this.horizonBlurEffect || !this.horizonBlurEffect.getEffect()) return;
 
-                const planet = scene.getMeshByName("planet");
-                if (!planet || !scene.activeCamera) return;
+            //     const planet = scene.getMeshByName("planet");
+            //     if (!planet || !scene.activeCamera) return;
 
-                try {
-                    const worldMatrix = planet.getWorldMatrix();
-                    const viewProjection = scene.getTransformMatrix();
-                    const worldViewProjection = worldMatrix.multiply(viewProjection);
+            //     try {
+            //         const worldMatrix = planet.getWorldMatrix();
+            //         const viewProjection = scene.getTransformMatrix();
+            //         const worldViewProjection = worldMatrix.multiply(viewProjection);
                     
-                    const effect = this.horizonBlurEffect.getEffect();
-                    if (!effect || !effect.setMatrix || !effect.setVector3 || !effect.setFloat) return;
+            //         const effect = this.horizonBlurEffect.getEffect();
+            //         if (!effect || !effect.setMatrix || !effect.setVector3 || !effect.setFloat) return;
 
-                    effect.setMatrix("worldViewProjection", worldViewProjection);
-                    effect.setVector3("planetCenter", planet.position);
+            //         effect.setMatrix("worldViewProjection", worldViewProjection);
+            //         effect.setVector3("planetCenter", planet.position);
                     
-                    // Update radius parameter for dynamic effect
-                    const distanceToCamera = Vector3.Distance(planet.position, scene.activeCamera.position);
-                    const dynamicRadius = Math.max(1.0, Math.min(3.0, distanceToCamera / 10));
-                    effect.setFloat("radius", dynamicRadius);
-                } catch (error) {
-                    console.warn("Error updating horizon blur effect:", error);
-                }
-            });
+            //         // Update radius parameter for dynamic effect
+            //         const distanceToCamera = Vector3.Distance(planet.position, scene.activeCamera.position);
+            //         const dynamicRadius = Math.max(1.0, Math.min(3.0, distanceToCamera / 10));
+            //         effect.setFloat("radius", dynamicRadius);
+            //     } catch (error) {
+            //         console.warn("Error updating horizon blur effect:", error);
+            //     }
+            // });
 
         } else {
             console.warn("No active camera found. Horizon effect will not be applied.");
@@ -129,6 +129,9 @@ export class BiomeManager {
         this.initialized = true;
     }
 
+    /**
+     * contains biomes content and descriptions
+     */
     private static setupBiomes(): void {
         // Define biomes in the order: grass → brick → stone → repeat
         this.biomes = [
@@ -345,9 +348,9 @@ export class BiomeManager {
             // Make sure to set the effect to null if creation failed
             this.horizonBlurEffect = null;
         }
-    }
+    } 
 
-    public static startBiomeTransition(scene: Scene): boolean {
+    public static goToNextBiome(scene: Scene): boolean {
         if (!this.initialized) this.initialize(scene);
         
         // Check if enough time has passed since the last biome change
@@ -355,7 +358,6 @@ export class BiomeManager {
         const timeSinceLastChange = currentTime - this.lastBiomeChangeTime;
         
         if (timeSinceLastChange < this.cooldownPeriod) {
-            console.log('too soon')
             // Not enough time has passed, show cooldown message
             const remainingTime = Math.ceil((this.cooldownPeriod - timeSinceLastChange) / 1000);
             this.showCooldownMessage(scene, remainingTime);
@@ -367,7 +369,7 @@ export class BiomeManager {
         const nextBiome = this.biomes[nextBiomeIndex];
         
         // Start the vertex transition using your existing system
-        PlanetTransition.start(scene);
+        PlanetTransition.do(scene);
         
         // Update the last biome change time
         this.lastBiomeChangeTime = currentTime;
@@ -382,13 +384,13 @@ export class BiomeManager {
 
         // Transition is complete, apply the rest of the biome changes
         this.applyBiomeEnvironment(nextBiomeIndex);
-        // Remove narrative display
-        // this.showBiomeNarrative(this.biomes[nextBiomeIndex].narrative);
+        // Show narrative for the new biome
+        this.showBiomeNarrative(this.biomes[nextBiomeIndex].narrative);
         this.playBiomeSound(this.biomes[nextBiomeIndex].soundPath);
 
         // Check every frame if the transition is complete
         const observer = scene.onBeforeRenderObservable.add(() => {
-            if (!PlanetTransition.transitionRunning && Materials.getActiveMaterialIndex() === this.biomes[nextBiomeIndex].materialIndex) {
+            if (Materials.getActiveMaterialIndex() === this.biomes[nextBiomeIndex].materialIndex) {
                 
                 // Update current biome index
                 this.currentBiomeIndex = nextBiomeIndex;
@@ -397,6 +399,75 @@ export class BiomeManager {
                 scene.onBeforeRenderObservable.remove(observer);
             }
         });
+    }
+    
+    private static showBiomeNarrative(narrative: string): void {
+        if (!this.scene || !narrative) return;
+        
+        // Clean up previous UI if exists
+        if (this.cooldownUI) {
+            this.cooldownUI.dispose();
+        }
+        
+        // Create fullscreen UI
+        this.cooldownUI = AdvancedDynamicTexture.CreateFullscreenUI("BiomeNarrativeUI", true, this.scene);
+        
+        // Create container for text
+        const container = new Container("narrativeContainer");
+        container.width = 0.8;
+        container.height = "120px";
+        container.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+        container.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+        container.top = "-50px";
+        container.zIndex = 10;
+        container.background = "rgba(0, 0, 0, 0.7)";
+        this.cooldownUI.addControl(container);
+        
+        // Create text block for biome narrative
+        const narrativeText = new TextBlock("narrativeText");
+        narrativeText.text = narrative;
+        narrativeText.color = "#FFFFFF";
+        narrativeText.fontSize = 18;
+        narrativeText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+        narrativeText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+        narrativeText.paddingTop = "10px";
+        container.addControl(narrativeText);
+        
+        // Create text block for cooldown message
+        this.cooldownMessage = new TextBlock("cooldownText");
+        this.cooldownMessage.text = `Please wait ${Math.ceil(this.cooldownPeriod / 1000)} seconds before changing biomes...`;
+        this.cooldownMessage.color = "#FFA500";
+        this.cooldownMessage.fontSize = 16;
+        this.cooldownMessage.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+        this.cooldownMessage.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+        this.cooldownMessage.paddingBottom = "10px";
+        container.addControl(this.cooldownMessage);
+        
+        // Update the countdown timer every second
+        let timeRemaining = Math.ceil(this.cooldownPeriod / 1000);
+        const countdownInterval = setInterval(() => {
+            timeRemaining--;
+            if (timeRemaining <= 0) {
+                clearInterval(countdownInterval);
+                if (this.cooldownUI) {
+                    this.cooldownUI.dispose();
+                    this.cooldownUI = null;
+                    this.cooldownMessage = null;
+                }
+            } else if (this.cooldownMessage) {
+                this.cooldownMessage.text = `Please wait ${timeRemaining} seconds before changing biomes...`;
+            }
+        }, 1000);
+        
+        // Auto-dispose after the cooldown period ends
+        setTimeout(() => {
+            clearInterval(countdownInterval);
+            if (this.cooldownUI) {
+                this.cooldownUI.dispose();
+                this.cooldownUI = null;
+                this.cooldownMessage = null;
+            }
+        }, this.cooldownPeriod);
     }
     
     private static applyBiomeEnvironment(biomeIndex: number): void {
@@ -431,11 +502,6 @@ export class BiomeManager {
         // Update the last biome change time when environment is applied
         // This ensures the cooldown starts when the biome is actually loaded
         this.lastBiomeChangeTime = Date.now();
-    }
-    
-    private static showBiomeNarrative(narrative: string): void {
-        // Do nothing - narrative display is disabled
-        return;
     }
     
     private static showCooldownMessage(scene: Scene, remainingTime: number): void {
@@ -586,6 +652,10 @@ export class BiomeManager {
     
     public static getBiomeCount(): number {
         return this.biomes.length;
+    }
+    
+    public static getBiomes(): BiomeData[] {
+        return this.biomes;
     }
     
     public static dispose(): void {

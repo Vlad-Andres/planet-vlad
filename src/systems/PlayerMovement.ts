@@ -1,51 +1,39 @@
 import {
     Scene,
-    Engine,
     Vector3,
-    Vector2,
-    HemisphericLight,
-    MeshBuilder,
-    FreeCamera,
-    Color3,
-    Color4,
-    PBRMaterial,
     KeyboardEventTypes,
     Mesh,
-    ArcRotateCamera,
     Matrix,
-    FollowCamera,
+    MeshBuilder
 } from '@babylonjs/core'
-import { Materials } from './Materials';
-import { PlanetTransition } from './PlanetTransition';
-import { BiomeManager } from './BiomeManager';
+import { PlanetTransition } from '../transitions/PlanetTransition';
+import { BiomeManager } from '../managers/BiomeManager';
+
 export class PlayerMovement {
     player!: Mesh;
-    playerHeading!: Vector3;  // NEW: player's current tangent heading
+    playerHeading!: Vector3;
     planet!: Mesh;
-    private moveDirection = Vector3.Zero();
     private readonly MOVE_SPEED = 0.07;
     private keysPressed: Set<string> = new Set();
     static playerUP: Vector3 = Vector3.Zero();
-    private lastActionTime: number = 0;  // Track last action time
-    private readonly ACTION_DELAY: number = 500;  // Delay in milliseconds
+    private lastActionTime: number = 0;
+    private readonly ACTION_DELAY: number = 500;
     private currentBiomIndex: number = 0;
-    private readonly LANDMARK_PROXIMITY_THRESHOLD = 4; // Distance threshold for landmark interaction
-    // Biome-specific landmark proximity thresholds
-    private readonly BIOME_THRESHOLDS = [
-        34, // First biome (Childhood in Moldova) threshold
-        20, // Second biome (Moving to the Big City) threshold
-        1, // Third biome (The Netherlands) threshold
-        2,3  // Fourth biome (Iceland) threshold
-    ];
-    private readonly VERTICAL_OFFSET_FACTOR = 0.15; // Factor to adjust threshold based on vertical offset
+    private readonly BIOME_THRESHOLDS = [34, 20, 1, 2.3];
 
-
-    constructor(planet: Mesh, scene: Scene) {
-        this.planet = planet
-        this.createPlayer(scene)
-        this.setupControls(scene)
+    constructor(planet: Mesh, scene: Scene, enableInternalControls: boolean = true) {
+        this.planet = planet;
+        this.createPlayer(scene);
+        if (enableInternalControls) {
+            this.setupControls(scene);
+        }
     }
 
+    // public wrappers used by GameSystemManager
+    public moveForward(): void { this.movePlayerArc(this.MOVE_SPEED); }
+    public moveBackward(): void { this.movePlayerArc(-this.MOVE_SPEED); }
+    public rotateLeft(): void { this.rotatePlayerHeading(0.1); }
+    public rotateRight(): void { this.rotatePlayerHeading(-0.1); }
     private createPlayer(scene: Scene): void {
         // Create player
         this.player = MeshBuilder.CreateSphere('player', { diameter: 1, segments: 16 }, scene);
@@ -67,17 +55,12 @@ export class PlayerMovement {
         if (currentTime - this.lastActionTime < this.ACTION_DELAY) {
             return; // Skip if not enough time has passed
         }
-        if (PlanetTransition.transitionRunning && !PlanetTransition.currentlyHiding) {
-            console.log('running')
-            this.lastActionTime = currentTime;
-            PlanetTransition.transitHiddenFaces(scene)
-        }
+        this.lastActionTime = currentTime;
+        PlanetTransition.do(scene)
     }
 
     // Assume playerHeading is already defined and normalized.
     private checkLandmarkProximity(): void {
-        if (PlanetTransition.transitionRunning) return;
-
         const landmark = PlanetTransition.getCurrentLandmark();
         if (!landmark) return;
 
@@ -94,21 +77,22 @@ export class PlayerMovement {
 
         // Get current biome index
         const currentBiomeIndex = BiomeManager.getCurrentBiomeIndex();
-        console.log(currentBiomeIndex)
         // Get the base threshold for the current biome
         const baseThreshold = this.BIOME_THRESHOLDS[this.currentBiomIndex] || 15;
         
         const distance = Vector3.Distance(this.player.position, instancePosition);
-        console.log(`Distance to landmark: ${distance}, Threshold: ${baseThreshold}`);
+        // console.log(`Distance to landmark: ${distance}, Threshold: ${baseThreshold}`);
         
-        if (distance < baseThreshold && BiomeManager.startBiomeTransition(this.player.getScene())) {
-            this.currentBiomIndex++;
-        }
+        // tODO: Problem here
+        
+        // if (distance < baseThreshold && BiomeManager.startBiomeTransition(this.player.getScene())) {
+        //     this.currentBiomIndex++;
+        // }
     }
-
+    // OLD way, disabled, now TransitionPhase takes care of it
     private setupControls(scene: Scene): void {
         scene.onKeyboardObservable.add((kbInfo) => {
-            this.runTransitionIfApplicable(scene)
+            // this.runTransitionIfApplicable(scene)
             const key = kbInfo.event.key.toLowerCase();
             if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
                 this.keysPressed.add(key);
@@ -130,9 +114,9 @@ export class PlayerMovement {
             if (this.keysPressed.has('d')) {
                 this.rotatePlayerHeading(-0.1);
             }
-            if (this.keysPressed.has('n') && !PlanetTransition.transitionRunning) {
+            if (this.keysPressed.has('n')) {
                 // Use BiomeManager instead of directly calling PlanetTransition
-                BiomeManager.startBiomeTransition(scene);
+                BiomeManager.goToNextBiome(scene);
             }
         });
     }
