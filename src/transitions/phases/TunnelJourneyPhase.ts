@@ -10,6 +10,7 @@ export class TunnelJourneyPhase implements TransitionPhase {
     async execute(): Promise<void> {
         return new Promise((resolve) => {
             if (!(this.camera instanceof FollowCamera)) {
+                console.log('TunnelJourneyPhase: camera is not a FollowCamera');
                 resolve();
                 return;
             }

@@ -102,7 +102,7 @@ export class AppOne {
         this.canvas.focus();
         
         // Enable debug mode after a short delay
-        setTimeout(() => this.debug(true), 100);
+        // setTimeout(() => this.debug(true), 100);
 
         // Initialize FPS counter overlay
         this.initFpsCounter();
