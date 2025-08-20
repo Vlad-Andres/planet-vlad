@@ -73,6 +73,8 @@ export class AppOne {
 
         // Player and camera setup comes first
         this.playerMovement = new PlayerMovement(this.planet, this.scene, false);
+        // Wait for the player mesh to be ready before setting up camera and dependent systems
+        await this.playerMovement.ready;
         this.setupCamera();
 
         // Now that a camera exists, initialize biome systems (they may attach post-processes/UI)
@@ -91,6 +93,42 @@ export class AppOne {
 
         // Spawn all planet objects once biomes are ready
         PlanetTransition.imediatelySpawnAll(this.scene);
+    }
+
+    setupCamera(): void {
+        this.camera = new FollowCamera("camera", new Vector3(-Math.PI/2, Math.PI/4, 6), this.scene);        
+        const player = this.scene.getMeshByName("player") as Mesh | null;
+        if (!player) {
+            console.error('Player mesh not found when setting up camera');
+            return;
+        }
+    
+        const cameraDistance = 12;
+        this.camera.lockedTarget = player;
+        this.camera.radius = cameraDistance;
+        this.camera.heightOffset = 4;
+        this.camera.cameraAcceleration = 0.05;
+        this.camera.maxCameraSpeed = 20;
+        this.camera.attachControl();
+    
+        // Keep camera's position and orientation stable using player's heading and up vector
+        this.scene.onBeforeRenderObservable.add(() => {
+            if (!player) return;
+            const playerUp = player.position.subtract(this.planet.position).normalize();
+            const playerForward = this.playerMovement.getCurrentHeading();
+            const playerRight = Vector3.Cross(playerForward, playerUp).normalize();
+            const adjustedForward = Vector3.Cross(playerUp, playerRight).normalize();
+    
+            // Use the camera's radius property instead of hardcoded distance
+            const currentCameraDistance = this.camera.radius;
+            const cameraOffset = adjustedForward.scale(-currentCameraDistance);
+            
+            // Apply height offset
+            const heightOffset = playerUp.scale(this.camera.heightOffset);
+            
+            this.camera.position = player.position.add(cameraOffset).add(heightOffset);
+            this.camera.upVector = Vector3.Lerp(this.camera.upVector, playerUp, 0.1); // Smooth transition
+        });
     }
 
     /**
@@ -298,41 +336,5 @@ export class AppOne {
         scene.fogMode = Scene.FOGMODE_EXP2;
         scene.fogColor = new Color3(0.15, 0, 0.3); // Purple fog
         scene.fogDensity = 0.002; // Slightly denser fog for more atmosphere
-    }
-
-    /**
-     * Configures the follow camera to track the player.
-     * Sets up camera parameters and adds a render observable to maintain proper orientation
-     * relative to the planet's surface and player's heading.
-     */
-    setupCamera(): void {
-        this.camera = new FollowCamera("camera", new Vector3(-Math.PI/2, Math.PI/4, 6), this.scene);        
-        const player = this.scene.getMeshByName("player") as Mesh;
-    
-        const cameraDistance = 12;
-        this.camera.lockedTarget = player;
-        this.camera.radius = cameraDistance;
-        this.camera.heightOffset = 4;
-        this.camera.cameraAcceleration = 0.05;
-        this.camera.maxCameraSpeed = 20;
-        this.camera.attachControl();
-    
-        // Keep camera's position and orientation stable using player's heading and up vector
-        this.scene.onBeforeRenderObservable.add(() => {
-            const playerUp = player.position.subtract(this.planet.position).normalize();
-            const playerForward = this.playerMovement.getCurrentHeading();
-            const playerRight = Vector3.Cross(playerForward, playerUp).normalize();
-            const adjustedForward = Vector3.Cross(playerUp, playerRight).normalize();
-    
-            // Use the camera's radius property instead of hardcoded distance
-            const currentCameraDistance = this.camera.radius;
-            const cameraOffset = adjustedForward.scale(-currentCameraDistance);
-            
-            // Apply height offset
-            const heightOffset = playerUp.scale(this.camera.heightOffset);
-            
-            this.camera.position = player.position.add(cameraOffset).add(heightOffset);
-            this.camera.upVector = Vector3.Lerp(this.camera.upVector, playerUp, 0.1); // Smooth transition
-        });
     }
 }
